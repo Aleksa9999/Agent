@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type Locale, type MessageKey, pickLocale, t } from "@/lib/messages";
 import { CatalogScreen } from "./catalog";
+import { ProfileScreen } from "./profile";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
 
 type TelegramWebApp = {
@@ -11,6 +12,7 @@ type TelegramWebApp = {
   ready: () => void;
   expand: () => void;
   initDataUnsafe?: { user?: { language_code?: string } };
+  close?: () => void;
 };
 
 declare global {
@@ -54,6 +56,11 @@ export default function Home() {
           <Message
             title={t(locale, "hello", { name: state.user.first_name })}
             body={t(locale, "ready_body")}
+          />
+          <ProfileScreen
+            locale={locale}
+            initData={window.Telegram?.WebApp?.initData ?? ""}
+            tenant={tenantFromSearch(window.location.search)}
           />
           <CatalogScreen
             locale={locale}

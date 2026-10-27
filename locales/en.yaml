@@ -72,3 +72,88 @@ skill_published: "Skill {title} ({version}) is published in the catalog."
 skill_discarded: "Upload cancelled, the skill did not reach the catalog."
 skill_publish_stale: "A version at least this new came out meanwhile. Upload the skill again."
 skill_publish_gone: "This upload was already handled or is out of date."
+
+pf_star_hint: ⭐ — the option that fits most often
+pf_compare_head: 'Why I ask: {why}'
+pf_compare_line: '{n}. {title}{star}'
+pf_voice_busy: Listening and noting the main points…
+pf_voice_unavailable: Voice recognition is not connected right now. Fill in the form in the Mini App with buttons.
+pf_voice_error: I could not recognise the recording. Try again or fill in the form with buttons.
+pf_voice_empty: I hear no speech in the recording. Record again, closer to the microphone.
+pf_voice_nothing: I found nothing about you in the story. Tell me about your role, goals, time and experience, or fill in the form with buttons.
+pf_voice_too_big: The recording is too long. Keep it under five minutes.
+pf_voice_limit: Too many recordings in a row. Try again in a few minutes.
+pf_voice_filled: 'Heard and noted: {done} of {total}. A few things left to clarify: {left}.'
+pf_voice_complete: 'Heard and noted everything needed: {done} of {total}. The form is complete, see the result in the Mini App.'
+pq_role: Who are you right now?
+pq_role_why: Sets the path and the tone of our talk.
+pq_role_o1: My own business or self-employed
+pq_role_o2: Employed
+pq_role_o3: Studying at school or university
+pq_role_o4: Looking for myself, no set path yet
+pq_goal_10w: What do you want within the next 10 weeks?
+pq_goal_10w_why: The first skills depend on it.
+pq_goal_10w_o1: First clients or money
+pq_goal_10w_o2: A working prototype or a site
+pq_goal_10w_o3: To learn AI skills
+pq_goal_10w_o4: To find an idea and test it
+pq_goal_year: And what do you want within a year?
+pq_goal_year_why: Shows where to lead you next.
+pq_goal_year_o1: Steady income from my own work
+pq_goal_year_o2: To change job or profession
+pq_goal_year_o3: Strong skills and a portfolio
+pq_goal_year_o4: To launch my own product
+pq_idea: Do you have a project idea?
+pq_idea_why: Decides whether to start with finding or testing an idea.
+pq_idea_o1: Yes, a clear idea
+pq_idea_o2: Rough ideas, need to test them
+pq_idea_o3: Several ideas, none chosen
+pq_idea_o4: No idea, I want to find one
+pq_business: How is your business right now?
+pq_business_why: Decides where to look for routine and clients.
+pq_business_o1: Running, I have clients
+pq_business_o2: Just launching
+pq_business_o3: Offering services as self-employed
+pq_business_o4: Only planning to start
+pq_audience: Do you have your own audience?
+pq_audience_why: Needed to pick a way to find the first clients.
+pq_audience_o1: Yes, over a thousand people
+pq_audience_o2: Small, under a thousand
+pq_audience_o3: Only friends and clients
+pq_audience_o4: Not yet
+pq_time_week: How many hours a week can you give?
+pq_time_week_why: Sets the size of tasks in the first skills.
+pq_time_week_o1: Up to 3 hours
+pq_time_week_o2: 3 to 7 hours
+pq_time_week_o3: 8 to 15 hours
+pq_time_week_o4: More than 15 hours
+pq_budget: What monthly budget for the project and AI services?
+pq_budget_why: 'Limits the box tier: economy, standard or premium.'
+pq_budget_o1: Almost zero
+pq_budget_o2: Up to 5,000 rubles
+pq_budget_o3: 5,000 to 30,000 rubles
+pq_budget_o4: More than 30,000 rubles
+pq_experience: What is closer to your experience and interests?
+pq_experience_why: Helps pick ideas and a niche.
+pq_experience_o1: Sales and working with people
+pq_experience_o2: Technology and programming
+pq_experience_o3: Creative work, content, design
+pq_experience_o4: Education and explaining
+pq_ai_level: How do you work with AI now?
+pq_ai_level_why: Decides which step to start the explanations from.
+pq_ai_level_o1: Have not used it yet
+pq_ai_level_o2: Sometimes ask a chatbot
+pq_ai_level_o3: Use it weekly at work
+pq_ai_level_o4: Build processes and products with AI
+pq_tech_depth: How deep do you want to go into the technical side?
+pq_tech_depth_why: Decides whether the agent does it or you go through it yourself.
+pq_tech_depth_o1: Only the result
+pq_tech_depth_o2: A little of what is inside
+pq_tech_depth_o3: Learn the basics
+pq_tech_depth_o4: Do it myself by hand
+pq_country: Where do you live and which language is easier?
+pq_country_why: Affects the market, payment and the language of answers.
+pq_country_o1: Russia, Russian
+pq_country_o2: Another country, Russian
+pq_country_o3: Another country, English
+pq_country_o4: Russia, English

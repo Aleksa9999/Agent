@@ -128,6 +128,7 @@ make_env() {
   ask QWEN_API_KEY "Model Studio key (hidden, Enter to skip for now)" 1 0
   ask QWEN_MODEL "Model id from the console (Enter to skip for now)" 0 0
   ask QWEN_FAST_MODEL "Cheap model id for summaries (Enter to skip)" 0 0
+  ask QWEN_ASR_MODEL "Speech recognition model id for voice (Enter to skip)" 0 0
   mv "${tmp}" "${ENV_OUT}"
   chmod 600 "${ENV_OUT}"
   say "${ENV_OUT} written (mode 600). Values are not shown."

@@ -115,3 +115,20 @@ class SkillVersion(TenantMixin, Base):
     uploaded_by: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Profile(TenantMixin, Base):
+    """What the agent knows about a person from the entrance test. One row per person.
+
+    answers: field -> {kind, text, code}; state: where the questionnaire stands (see
+    app.profile.flow). version guards against two requests saving over each other."""
+
+    __tablename__ = "profiles"
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", name="uq_profiles_user"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    version: Mapped[int] = mapped_column(nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -19,8 +19,13 @@ from app.bot.handlers import build_router
 from app.bot.repo import BotRepo
 from app.bot.roles import RoleRegistry
 from app.bot.service import OnboardingService
+from app.bot.voice import VoiceIntake
 from app.config import Settings
 from app.i18n import Translator
+from app.profile.asr import AsrPort, QwenAsrClient
+from app.profile.service import ProfileService
+from app.profile.store import ProfileStore
+from app.ratelimit import RateLimiter
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 
@@ -37,6 +42,8 @@ class BotRuntime:
         repo: BotRepo,
         store: AgentStore,
         skills: SkillStore | None = None,
+        profiles: ProfileStore | None = None,
+        asr_factory: Callable[[str], AsrPort | None] | None = None,
         bot_factory: Callable[[str], Bot] | None = None,
         model_factory: Callable[[str], ModelPort | None] | None = None,
     ):
@@ -46,6 +53,11 @@ class BotRuntime:
         self.repo = repo
         self.store = store
         self.skills = skills
+        self.profiles = profiles
+        self._asr_factory = asr_factory or self._default_asr_factory
+        self._profile_services: dict[str, ProfileService] = {}
+        self._voice: dict[str, VoiceIntake] = {}
+        self.voice_limiter = RateLimiter(limit=6, window_seconds=600)
         self._model_factory = model_factory or self._default_model_factory
         self._chats: dict[str, AgentChat] = {}
         self._bot_factory = bot_factory or self._default_bot_factory
@@ -68,6 +80,41 @@ class BotRuntime:
             model=self.settings.qwen_model,
             fast_model=self.settings.qwen_fast_model,
         )
+
+    def _default_asr_factory(self, tenant_id: str) -> AsrPort | None:
+        key = self.settings.qwen_api_key or self.settings.dashscope_api_key
+        if key is None or not self.settings.qwen_asr_model:
+            return None  # voice is off until a key and an ASR model id are configured
+        return QwenAsrClient(
+            base_url=self.settings.qwen_asr_base_url,
+            api_key=key.get_secret_value(),
+            model=self.settings.qwen_asr_model,
+        )
+
+    def profile(self, tenant_id: str) -> ProfileService | None:
+        """The entrance test service; None when the database layer was not given."""
+        if self.profiles is None:
+            return None
+        if tenant_id not in self._profile_services:
+            self.tenants.get(tenant_id)
+            self._profile_services[tenant_id] = ProfileService(
+                store=self.profiles,
+                translator=self.translator,
+                prompts_dir=self.settings.prompts_dir,
+                model=self._model_factory(tenant_id),
+                asr=self._asr_factory(tenant_id),
+            )
+        return self._profile_services[tenant_id]
+
+    def voice(self, tenant_id: str) -> VoiceIntake | None:
+        profile = self.profile(tenant_id)
+        if profile is None:
+            return None
+        if tenant_id not in self._voice:
+            self._voice[tenant_id] = VoiceIntake(
+                svc=self.service(tenant_id), profile=profile, limiter=self.voice_limiter
+            )
+        return self._voice[tenant_id]
 
     def chat(self, tenant_id: str) -> AgentChat:
         if tenant_id not in self._chats:
@@ -122,6 +169,7 @@ class BotRuntime:
             dp.include_router(build_router())
             dp["svc"] = self.service(tenant_id)
             dp["chat"] = self.chat(tenant_id)
+            dp["voice"] = self.voice(tenant_id)
             self._dispatchers[tenant_id] = dp
         return self._dispatchers[tenant_id]
 

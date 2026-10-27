@@ -158,3 +158,25 @@ def document_update(user: dict, size: int, caption: str | None = None, update_id
     if caption:
         message["caption"] = caption
     return {"update_id": update_id, "message": message}
+
+
+def voice_update(
+    user: dict,
+    size: int = 1000,
+    mime: str | None = "audio/ogg",
+    update_id: int = 7,
+    thread_id: int | None = None,
+) -> dict:
+    voice = {"file_id": "voice1", "file_unique_id": "v1", "duration": 30, "file_size": size}
+    if mime:
+        voice["mime_type"] = mime
+    message = {
+        "message_id": 5,
+        "date": 0,
+        "chat": {"id": user["id"], "type": "private"},
+        "from": user,
+        "voice": voice,
+    }
+    if thread_id is not None:
+        message["message_thread_id"] = thread_id
+    return {"update_id": update_id, "message": message}

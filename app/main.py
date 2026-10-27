@@ -20,6 +20,8 @@ from app.db.tenants_sync import sync_tenants
 from app.i18n import Translator
 from app.logging_setup import setup_logging
 from app.miniapp_api.auth import InvalidInitDataError, TelegramUser, verify_init_data
+from app.miniapp_api.profile import register_profile_routes
+from app.profile.store import ProfileStore
 from app.skills.catalog import catalog_view
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
@@ -95,6 +97,7 @@ def create_app(
                     repo=BotRepo(engine),
                     store=AgentStore(engine),
                     skills=skill_store(),
+                    profiles=ProfileStore(engine),
                 )
             )
         return runtimes[0]
@@ -150,6 +153,10 @@ def create_app(
                 "locale": tenant.locale,
             }
         )
+
+    register_profile_routes(
+        app, authenticate=authenticate, get_runtime=get_runtime, settings=settings
+    )
 
     @app.get("/api/miniapp/{tenant_id}/catalog")
     def miniapp_catalog(tenant_id: str, request: Request) -> JSONResponse:

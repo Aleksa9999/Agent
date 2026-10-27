@@ -14,6 +14,7 @@ from app.config import Settings
 from app.db.base import Base, Tenant
 from app.db.session import enable_sqlite_foreign_keys
 from app.i18n import Translator
+from app.profile.store import ProfileStore
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 from tests.fake_telegram import GROUP_ID, FakeSession
@@ -94,18 +95,33 @@ def skill_store(settings: Settings, engine) -> SkillStore:
 
 
 @pytest.fixture
-def runtime(
-    settings: Settings, engine, session: FakeSession, skill_store: SkillStore
-) -> BotRuntime:
-    tenants = TenantRegistry.load(settings.tenants_dir)
-    bot = Bot(token="123456:TESTTOKEN", session=session)
-    return BotRuntime(
-        settings=settings,
-        tenants=tenants,
-        translator=Translator(settings.locales_dir, tenants),
-        repo=BotRepo(engine),
-        store=AgentStore(engine),
-        skills=skill_store,
-        bot_factory=lambda tenant_id: bot,
-        model_factory=lambda tenant_id: None,
-    )
+def profile_store(engine) -> ProfileStore:
+    return ProfileStore(engine)
+
+
+@pytest.fixture
+def make_runtime(settings: Settings, engine, session: FakeSession, skill_store, profile_store):
+    """Builds a runtime; the model and the speech recogniser are scripted per test."""
+
+    def build(model=None, asr=None) -> BotRuntime:
+        tenants = TenantRegistry.load(settings.tenants_dir)
+        bot = Bot(token="123456:TESTTOKEN", session=session)
+        return BotRuntime(
+            settings=settings,
+            tenants=tenants,
+            translator=Translator(settings.locales_dir, tenants),
+            repo=BotRepo(engine),
+            store=AgentStore(engine),
+            skills=skill_store,
+            profiles=profile_store,
+            bot_factory=lambda tenant_id: bot,
+            model_factory=lambda tenant_id: model,
+            asr_factory=lambda tenant_id: asr,
+        )
+
+    return build
+
+
+@pytest.fixture
+def runtime(make_runtime) -> BotRuntime:
+    return make_runtime()

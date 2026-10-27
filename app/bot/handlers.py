@@ -16,6 +16,7 @@ from app.bot.service import (
     parse_context_callback,
     parse_skill_callback,
 )
+from app.bot.voice import VoiceIntake
 
 
 def build_router() -> Router:
@@ -56,6 +57,12 @@ def build_router() -> Router:
     async def on_skill_upload(message: Message, svc: OnboardingService) -> None:
         if message.from_user:
             await svc.handle_skill_upload(message.from_user, message.chat.id)
+
+    @router.message(F.voice | F.audio, private)
+    async def on_voice(message: Message, voice: VoiceIntake | None) -> None:
+        media = message.voice or message.audio
+        if voice is not None and message.from_user and media:
+            await voice.handle(message.from_user, message.chat.id, message.message_thread_id, media)
 
     @router.message(F.document, private)
     async def on_document(message: Message, svc: OnboardingService) -> None:

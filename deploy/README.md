@@ -32,7 +32,7 @@ The manual version of the same steps follows.
 
 ## First start of the test stack, manual version (about 15 minutes)
 
-1. Copy `.env.example` to `.env.test` and fill it, including `TG_WEBHOOK_SECRET`, `GROUP_CHAT_ID`, `OWNER_TG_ID` and `WEBAPP_URL` (the public https address of this server). For the agent set `QWEN_API_KEY` (the Model Studio key, International region), `QWEN_MODEL` and `QWEN_FAST_MODEL` (exact model ids from the Model Studio console; without them the agent answers that it is unavailable). Add two lines for the stack itself:
+1. Copy `.env.example` to `.env.test` and fill it, including `TG_WEBHOOK_SECRET`, `GROUP_CHAT_ID`, `OWNER_TG_ID` and `WEBAPP_URL` (the public https address of this server). For the agent set `QWEN_API_KEY` (the Model Studio key, International region), `QWEN_MODEL` and `QWEN_FAST_MODEL` (exact model ids from the Model Studio console; without them the agent answers that it is unavailable) and `QWEN_ASR_MODEL` (the speech recognition model; without it voice stories are off and the form works with buttons). Add two lines for the stack itself:
    `POSTGRES_PASSWORD=` and `REDIS_PASSWORD=` (long random values; enter them on the server, do not paste them into chats).
 2. `chmod 600 .env.test`.
 3. `make stack-up` (it passes `--env-file .env.test` to Docker Compose).
