@@ -64,6 +64,15 @@ install_all() {
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   fi
+  # builds of the Mini App can spike in memory: a swap file is a cheap safety net
+  if [[ -z "$(swapon --show --noheadings)" ]]; then
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+    swapon /swapfile
+    grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    say "swap file of 2 GB created"
+  fi
   # SSH is allowed before the firewall is switched on, so the session is never cut off
   ufw allow 22/tcp
   ufw allow 80/tcp
