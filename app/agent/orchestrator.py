@@ -43,6 +43,16 @@ class SpecProposed:
     text: str
 
 
+@dataclass(frozen=True)
+class TasksProposed:
+    text: str
+
+
+@dataclass(frozen=True)
+class PackReady:
+    text: str
+
+
 @dataclass
 class Done:
     text: str
@@ -53,7 +63,9 @@ class Done:
     stopped: bool = False
 
 
-AgentEvent = TextDelta | ToolStarted | OptionsAsked | SpecProposed | Done
+AgentEvent = (
+    TextDelta | ToolStarted | OptionsAsked | SpecProposed | TasksProposed | PackReady | Done
+)
 
 
 class Agent:
@@ -145,6 +157,14 @@ class Agent:
                     return
                 if output.spec_text is not None:
                     yield SpecProposed(output.spec_text)
+                    yield done()
+                    return
+                if output.tasks_text is not None:
+                    yield TasksProposed(output.tasks_text)
+                    yield done()
+                    return
+                if output.pack_text is not None:
+                    yield PackReady(output.pack_text)
                     yield done()
                     return
                 messages.append(Message("tool", output.text, tool_call_id=call.id))

@@ -15,7 +15,8 @@ from app.skills.runs import ROADS, SkillRunService
 
 log = logging.getLogger("app.bot")
 SKILLS_CONTEXT = "dm_skills"
-ACTIONS = ("road", "spec")
+ACTIONS = ("road", "spec", "tasks")
+TASK_ACTIONS = ("ok", "aware", "fix", "add")
 
 
 def flow_callback(kind: str, action: str, run_id: int, rev: int | None = None) -> str:
@@ -29,11 +30,11 @@ def parse_flow_callback(data: str | None) -> tuple[str, str, int, int] | None:
     if len(parts) < 4 or parts[0] != CALLBACK_VERSION or parts[1] not in ACTIONS:
         return None
     kind, action = parts[1], parts[2]
-    allowed = ROADS if kind == "road" else ("ok", "fix")
+    allowed = ROADS if kind == "road" else TASK_ACTIONS if kind == "tasks" else ("ok", "fix")
     wanted = 4 if kind == "road" else 5
     if action not in allowed or len(parts) != wanted or not all(p.isdigit() for p in parts[3:]):
         return None
-    return kind, action, int(parts[3]), int(parts[4]) if kind == "spec" else 0
+    return kind, action, int(parts[3]), int(parts[4]) if kind != "road" else 0
 
 
 class SkillFlow:
@@ -119,6 +120,10 @@ class SkillFlow:
                 await query.answer(self.svc.t("run_stale"), show_alert=True)
                 return
             text = self.svc.t(f"run_road_{action}_text", title=doc.title)
+        elif kind == "tasks":
+            text = await self._tasks_button(query, row, run, action, rev)
+            if text is None:
+                return
         elif action == "ok":
             saved = await self.runs.agree(self.tenant, run_id, rev)
             if saved is None:
@@ -131,10 +136,52 @@ class SkillFlow:
                 await query.answer(self.svc.t("run_stale"), show_alert=True)
                 return
             text = self.svc.t("spec_fix_text")
-        await query.answer(self.svc.t("spec_saved") if kind == "spec" and action == "ok" else None)
+        saved_text = {"spec": "spec_saved", "tasks": "tasks_saved"}.get(kind)
+        await query.answer(
+            self.svc.t(saved_text) if saved_text and action in ("ok", "aware") else None
+        )
         if message:
             try:
                 await message.edit_reply_markup(reply_markup=None)
             except TelegramBadRequest:
                 pass  # too old to edit: the answer above is enough
         await self.chat.turn_for(row, query.from_user, chat_id, thread_id, SKILLS_CONTEXT, text)
+
+    async def _tasks_button(self, query, row, run, action: str, rev: int) -> str | None:
+        """ "Agree", "Conscious, agree", "Fix", "Add a slice". Returns the text for the agent's
+        next turn, or None when the button was stale (the person has been told)."""
+        t = self.svc.t
+        if action in ("fix", "add"):
+            if await self.runs.revise_tasks(self.tenant, run.id, rev) is None:
+                await query.answer(t("run_stale"), show_alert=True)
+                return None
+            return t("tasks_fix_text" if action == "fix" else "tasks_add_text")
+        before = await self.runs.get(self.tenant, run.id)
+        uncovered = list(before.tasks.get("uncovered", [])) if before and before.tasks else []
+        if action == "ok" and uncovered:  # a gap must be answered with its own button
+            await query.answer(t("run_stale"), show_alert=True)
+            return None
+        saved = await self.runs.agree_tasks(self.tenant, run.id, rev)
+        if saved is None:
+            await query.answer(t("run_stale"), show_alert=True)
+            return None
+        if action == "aware" and uncovered:
+            criteria = ", ".join(f"{t('tasks_k')}{k}" for k in uncovered)
+            await self.runs.record_decision(
+                self.tenant,
+                run.id,
+                t("tasks_aware_question", criteria=criteria),
+                t("tasks_aware_decision"),
+                "person",
+            )
+        doc = await self.runs.skills_doc(self.tenant, run.slug, run.version)
+        if doc is not None:
+            message = query.message if isinstance(query.message, Message) else None
+            await self.svc.bot.send_message(
+                chat_id=message.chat.id if message else row.dm_chat_id or query.from_user.id,
+                message_thread_id=message.message_thread_id if message else None,
+                text=t("tasks_estimate_intro")
+                + "\n"
+                + estimate_text(self.svc.tr, self.tenant, doc, self.catalog),
+            )
+        return t("tasks_agreed_text")

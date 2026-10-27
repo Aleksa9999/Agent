@@ -18,6 +18,13 @@ from app.db.base import utcnow
 from app.db.models import SkillRun
 from app.i18n import Translator
 from app.skills.store import SkillStore
+from app.skills.tasks import (
+    TaskError,
+    render_pack,
+    render_tasks,
+    validate_pack,
+    validate_tasks,
+)
 from skillkit.parse import PIPELINE_SECTION, RUN_SECTIONS, SkillDoc, section_texts
 
 log = logging.getLogger("app.skills")
@@ -26,6 +33,8 @@ ACTIVE, PAUSED = "active", "paused"
 ROADS = ("agent", "self")
 BATCH_LIMIT = 5
 PHASE_ROAD, PHASE_GRILL, PHASE_SPEC = "road", "grill", "spec"
+PHASE_TASKS, PHASE_PACK = "tasks", "pack"
+TASKS_NONE, TASKS_PROPOSED, TASKS_SAVED = "none", "proposed", "saved"
 SPEC_NONE, SPEC_PROPOSED, SPEC_SAVED = "none", "proposed", "saved"
 DECIDERS = ("person", "agent")
 FIELD_LIMIT = 600
@@ -49,6 +58,11 @@ class RunRow:
     spec_text: str | None
     spec_status: str
     spec_rev: int
+    tasks: dict | None
+    tasks_text: str | None
+    tasks_status: str
+    tasks_rev: int
+    pack_text: str | None
     batch_asked: int
 
 
@@ -66,6 +80,11 @@ def _row(r: SkillRun) -> RunRow:
         r.spec_text,
         r.spec_status,
         r.spec_rev,
+        r.tasks,
+        r.tasks_text,
+        r.tasks_status,
+        r.tasks_rev,
+        r.pack_text,
         r.batch_asked,
     )
 
@@ -99,6 +118,8 @@ class SkillRunStore:
                 decisions=[],
                 spec_status=SPEC_NONE,
                 spec_rev=0,
+                tasks_status=TASKS_NONE,
+                tasks_rev=0,
                 batch_asked=0,
             )
             s.add(run)
@@ -184,6 +205,40 @@ class SkillRunStore:
 
         return self._edit(tenant_id, run_id, change)
 
+    def propose_tasks(self, tenant_id: str, run_id: int, plan: dict, text: str) -> RunRow | None:
+        def change(run: SkillRun):
+            if run.spec_status != SPEC_SAVED:
+                return False  # no tasks before the spec is agreed
+            run.tasks, run.tasks_text = plan, text
+            run.tasks_status, run.phase = TASKS_PROPOSED, PHASE_TASKS
+            run.tasks_rev += 1
+
+        return self._edit(tenant_id, run_id, change)
+
+    def agree_tasks(self, tenant_id: str, run_id: int, rev: int) -> RunRow | None:
+        def change(run: SkillRun):
+            if run.tasks_status != TASKS_PROPOSED or run.tasks_rev != rev:
+                return False
+            run.tasks_status = TASKS_SAVED
+
+        return self._edit(tenant_id, run_id, change)
+
+    def revise_tasks(self, tenant_id: str, run_id: int, rev: int) -> RunRow | None:
+        def change(run: SkillRun):
+            if run.tasks_status != TASKS_PROPOSED or run.tasks_rev != rev:
+                return False
+            run.tasks_status, run.batch_asked = TASKS_NONE, 0
+
+        return self._edit(tenant_id, run_id, change)
+
+    def save_pack(self, tenant_id: str, run_id: int, text: str) -> RunRow | None:
+        def change(run: SkillRun):
+            if run.tasks_status != TASKS_SAVED:
+                return False  # no pack before the breakdown is agreed
+            run.pack_text, run.phase = text, PHASE_PACK
+
+        return self._edit(tenant_id, run_id, change)
+
     def revise(self, tenant_id: str, run_id: int, rev: int) -> RunRow | None:
         def change(run: SkillRun):
             if run.spec_status != SPEC_PROPOSED or run.spec_rev != rev:
@@ -260,9 +315,20 @@ class SkillRunService:
             wave_note=wave_note,
             decisions=decisions,
             spec_status=run.spec_status,
+            tasks_status=run.tasks_status,
+            saved_documents=self._saved_documents(run),
         )
         body = "\n\n".join(f"### {name}\n{content}" for name, content in sections.items())
         return head + "\n\n" + body
+
+    @staticmethod
+    def _saved_documents(run: RunRow) -> str:
+        parts = []
+        if run.spec_status == SPEC_SAVED and run.spec_text:
+            parts.append("Agreed spec:\n" + run.spec_text)
+        if run.tasks_status == TASKS_SAVED and run.tasks_text:
+            parts.append("Agreed tasks:\n" + run.tasks_text)
+        return "\n\n".join(parts) or "(none yet)"
 
     # decisions -------------------------------------------------------------------
     @staticmethod
@@ -353,8 +419,45 @@ class SkillRunService:
             raise SpecError("the skill is no longer in the catalog")
         spec = self.validate_spec(arguments)
         fresh = await asyncio.to_thread(self.store.get, tenant, run.id)
+        if fresh is not None and fresh.spec_status == SPEC_SAVED:
+            raise SpecError("the spec is already agreed and saved; go on to the tasks")
         text = self.render_spec(tenant, doc, spec, fresh or run)
         await asyncio.to_thread(self.store.propose, tenant, run.id, spec, text)
+        return text
+
+    async def propose_tasks(self, tenant: str, run: RunRow, arguments: dict) -> str:
+        """Validates the breakdown against the saved spec; returns the text to show."""
+        fresh = await asyncio.to_thread(self.store.get, tenant, run.id)
+        doc = await asyncio.to_thread(self.skills.get, tenant, run.slug, run.version)
+        if fresh is None or doc is None or fresh.spec is None or fresh.spec_status != SPEC_SAVED:
+            raise TaskError("the spec is not agreed yet; tasks come after it")
+        plan = validate_tasks(arguments, fresh.spec, self._rules)
+        text = render_tasks(lambda key, **v: self.t(tenant, key, **v), doc, fresh.spec, plan)
+        if await asyncio.to_thread(self.store.propose_tasks, tenant, run.id, plan, text) is None:
+            raise TaskError("the breakdown could not be saved now")
+        return text
+
+    async def agree_tasks(self, tenant: str, run_id: int, rev: int) -> RunRow | None:
+        return await asyncio.to_thread(self.store.agree_tasks, tenant, run_id, rev)
+
+    async def revise_tasks(self, tenant: str, run_id: int, rev: int) -> RunRow | None:
+        return await asyncio.to_thread(self.store.revise_tasks, tenant, run_id, rev)
+
+    async def build_pack(self, tenant: str, run: RunRow, arguments: dict) -> str:
+        """The "do it yourself" pack for the agreed tasks. It holds prompts, never project code."""
+        fresh = await asyncio.to_thread(self.store.get, tenant, run.id)
+        doc = await asyncio.to_thread(self.skills.get, tenant, run.slug, run.version)
+        ready = (
+            fresh is not None and fresh.tasks_status == TASKS_SAVED and fresh.spec and fresh.tasks
+        )
+        if not ready or doc is None:
+            raise TaskError("the breakdown is not agreed yet; the pack comes after it")
+        pack = validate_pack(arguments, fresh.tasks, self._rules)
+        text = render_pack(
+            lambda key, **v: self.t(tenant, key, **v), doc, fresh.spec, fresh.tasks, pack
+        )
+        if await asyncio.to_thread(self.store.save_pack, tenant, run.id, text) is None:
+            raise TaskError("the pack could not be saved now")
         return text
 
     async def agree(self, tenant: str, run_id: int, rev: int) -> RunRow | None:

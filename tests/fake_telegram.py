@@ -50,7 +50,7 @@ class FakeSession(BaseSession):
         elif name == "createForumTopic":
             self._thread += 1
             result = {"message_thread_id": self._thread, "name": method.name, "icon_color": 0}
-        elif name == "sendMessage":
+        elif name in ("sendMessage", "sendDocument"):
             self._message += 1
             result = {
                 "message_id": self._message,
@@ -59,7 +59,7 @@ class FakeSession(BaseSession):
                     "id": method.chat_id,
                     "type": "private" if method.chat_id > 0 else "supergroup",
                 },
-                "text": method.text,
+                "text": getattr(method, "text", None) or getattr(method, "caption", None),
             }
         content = json.dumps({"ok": True, "result": result})
         return self.check_response(bot=bot, method=method, status_code=200, content=content).result

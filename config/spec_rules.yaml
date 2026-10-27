@@ -15,3 +15,12 @@ work_done_prefixes:
 min_criterion_chars: 15
 max_criteria: 15
 min_how_chars: 20
+# Tasks (vertical slices) and the prompt pack
+min_task_title_chars: 5
+min_task_what_chars: 20
+max_tasks: 12
+# The agent does not write the project code of a person: a prompt pack describes behavior,
+# constraints and checks, it holds no code blocks.
+forbid_code_fence_in_pack: true
+code_fence: "```"
+min_pack_field_chars: 10

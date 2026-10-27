@@ -200,3 +200,44 @@ spec_saved: Спека записана.
 spec_agreed_text: Спека согласована и записана. Продолжай.
 spec_fix_text: Спеку нужно поправить. Спроси, что именно не так, и предложи новую.
 decision_unknown_why: 'по вашему «не знаю»: взят рекомендованный вариант'
+tasks_title: Задачи навыка «{title}»
+tasks_item: '{n}. {title}'
+tasks_blocked: 'Блокируется: {tasks}'
+tasks_blocked_none: 'Блокируется: ничем, можно брать сразу'
+tasks_what: 'Что даёт: {text}'
+tasks_closes: 'Закрывает: {criteria}'
+tasks_closes_none: 'Закрывает: нет (подготовка)'
+tasks_k: К
+tasks_cov_head: Карта покрытия критериев
+tasks_cov_line: К{k} → {tasks}
+tasks_uncovered_head: Не закрыто ничем
+tasks_uncovered_line: 'К{k}: {text}'
+tasks_aware_ask: Это осознанное решение или пропуск? Если пропуск, добавим срез.
+tasks_ask: Согласны с такой нарезкой? Пока вы не нажмёте кнопку, я её не записываю.
+tasks_agree: Согласен
+tasks_aware: Осознанно, согласен
+tasks_fix: Поправить
+tasks_add: Добавить срез
+tasks_saved: Нарезка записана.
+tasks_agreed_text: Нарезка согласована и записана, смета показана. Составь пакет промптов «пройти самому».
+tasks_fix_text: Нарезку нужно поправить. Спроси, что именно не так, и предложи новую.
+tasks_add_text: Нужно добавить срез под критерии, которые ничем не закрыты. Предложи новую нарезку.
+tasks_aware_question: Критерии {criteria} не закрыты ни одним срезом
+tasks_aware_decision: осознанно оставлено без среза
+tasks_estimate_intro: 'Смета для этой нарезки. Цены только из каталога моделей:'
+pack_title: 'Пакет «пройти самому»: {title}'
+pack_h_steps: Порядок работы
+pack_h_rules: Правила для вашего Claude Code (положите в CLAUDE.md)
+pack_h_checklist: Чек-лист результата
+pack_h_prompts: Промпты по срезам
+pack_rule_secrets: Ключи и пароли не вставляй в промпты и файлы проекта, храни их в .env.
+pack_rule_scope: Делай только то, что описано в срезе, и после каждого среза запускай проверки.
+pack_check_line: '[ ] К{k}. {text}'
+pack_prompt_head: 'Срез {n}: {title}'
+pack_goal: 'Цель: {text}'
+pack_context: 'Контекст: {text}'
+pack_constraints: 'Ограничения: {text}'
+pack_checks: 'Проверки: {text}'
+pack_caption: Пакет промптов «пройти самому» для навыка «{title}».
+pack_done: 'Пакет готов. Работайте по нему у себя, а когда будет результат на вашей задаче, принесите его сюда: я сверю его с критериями.'
+pack_filename: skill-pack

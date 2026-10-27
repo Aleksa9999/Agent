@@ -8,6 +8,7 @@ from pathlib import Path
 
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import (
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -18,7 +19,14 @@ from aiogram.types import User as TgUser
 
 from app.agent.context import ContextInputs
 from app.agent.model import ModelError
-from app.agent.orchestrator import Agent, Done, OptionsAsked, SpecProposed
+from app.agent.orchestrator import (
+    Agent,
+    Done,
+    OptionsAsked,
+    PackReady,
+    SpecProposed,
+    TasksProposed,
+)
 from app.agent.prompts import load_prompt
 from app.agent.store import AgentStore
 from app.agent.types import Message as AgentMessage
@@ -215,6 +223,8 @@ class AgentChat:
         parts: list[str] = []
         question = None
         spec_text: str | None = None
+        tasks_text: str | None = None
+        pack_text: str | None = None
         done: Done | None = None
         drafts_ok = True
         last_push = 0.0
@@ -230,6 +240,10 @@ class AgentChat:
                     question = event.question
                 elif isinstance(event, SpecProposed):
                     spec_text = event.text
+                elif isinstance(event, TasksProposed):
+                    tasks_text = event.text
+                elif isinstance(event, PackReady):
+                    pack_text = event.text
                 elif isinstance(event, Done):
                     done = event
         except ModelError as exc:
@@ -254,6 +268,10 @@ class AgentChat:
             await self._send_question(row, chat_id, thread_id, context, question)
         if spec_text is not None and run is not None:
             await self._send_spec(row, chat_id, thread_id, context, run.id, spec_text)
+        if tasks_text is not None and run is not None:
+            await self._send_tasks(row, chat_id, thread_id, context, run.id, tasks_text)
+        if pack_text is not None and run is not None:
+            await self._send_pack(row, chat_id, thread_id, context, run, pack_text)
         if run is not None and question is None and self.runs is not None:
             await self.runs.reset_batch(self.tenant, run.id)  # a block of questions ended
 
@@ -303,6 +321,57 @@ class AgentChat:
                 reply_markup=keyboard if last else None,
             )
         await self.store.add_message(self.tenant, row.id, context, "assistant", full)
+
+    async def _send_tasks(self, row, chat_id, thread_id, context, run_id, tasks_text) -> None:
+        """The breakdown goes to the person; criteria that nothing closes are asked about."""
+        t = self.svc.t
+        current = await self.runs.get(self.tenant, run_id) if self.runs else None
+        rev = current.tasks_rev if current else 0
+        uncovered = bool(current and current.tasks and current.tasks.get("uncovered"))
+        base = f"{CALLBACK_VERSION}:tasks"
+        if uncovered:
+            first = ("tasks_aware", f"{base}:aware:{run_id}:{rev}")
+            second = ("tasks_add", f"{base}:add:{run_id}:{rev}")
+        else:
+            first = ("tasks_agree", f"{base}:ok:{run_id}:{rev}")
+            second = ("tasks_fix", f"{base}:fix:{run_id}:{rev}")
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=t(first[0]), callback_data=first[1], style=BLUE),
+                    InlineKeyboardButton(text=t(second[0]), callback_data=second[1]),
+                ]
+            ]
+        )
+        full = tasks_text + "\n\n" + t("tasks_ask")
+        chunks = _chunks(full)
+        for index, chunk in enumerate(chunks):
+            last = index == len(chunks) - 1
+            await self.svc.bot.send_message(
+                chat_id=chat_id,
+                message_thread_id=thread_id,
+                text=chunk,
+                reply_markup=keyboard if last else None,
+            )
+        await self.store.add_message(self.tenant, row.id, context, "assistant", full)
+
+    async def _send_pack(self, row, chat_id, thread_id, context, run, pack_text) -> None:
+        """The "do it yourself" pack goes out as a file the person keeps."""
+        t = self.svc.t
+        title = t("pack_caption", title=run.slug)
+        doc = await self.runs.skills_doc(self.tenant, run.slug, run.version) if self.runs else None
+        if doc is not None:
+            title = t("pack_caption", title=doc.title)
+        await self.svc.bot.send_document(
+            chat_id=chat_id,
+            message_thread_id=thread_id,
+            document=BufferedInputFile(pack_text.encode("utf-8"), filename=f"{run.slug}-pack.md"),
+            caption=title[:1000],
+        )
+        await self.svc.bot.send_message(
+            chat_id=chat_id, message_thread_id=thread_id, text=t("pack_done")
+        )
+        await self.store.add_message(self.tenant, row.id, context, "assistant", pack_text)
 
     async def _send_question(self, row, chat_id, thread_id, context, question) -> None:
         text = options_ui.render_text(question, self.svc.t("option_star"))

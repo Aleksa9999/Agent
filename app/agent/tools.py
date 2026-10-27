@@ -15,10 +15,16 @@ from app.agent.prompts import load_prompt
 from app.agent.types import FunctionSpec, Message, ModelRequest, ToolCall, Usage
 from app.i18n import Translator
 from app.skills.runs import BATCH_LIMIT, RunScope, SpecError
+from app.skills.tasks import TaskError
 
 log = logging.getLogger("app.agent")
 
-RUN_HANDLERS = {"record_decision": "_record_decision", "propose_spec": "_propose_spec"}
+RUN_HANDLERS = {
+    "record_decision": "_record_decision",
+    "propose_spec": "_propose_spec",
+    "propose_tasks": "_propose_tasks",
+    "propose_pack": "_propose_pack",
+}
 RESEARCH_TOOLS = ("web_search", "web_extractor")
 SANDBOX_TOOLS = ("code_interpreter", "web_search", "web_extractor")
 
@@ -29,6 +35,8 @@ class ToolOutput:
     question: Question | None = None  # set by ask_options: the turn ends and the person answers
     usage: Usage | None = None
     spec_text: str | None = None  # set by propose_spec: the turn ends and the person decides
+    tasks_text: str | None = None  # set by propose_tasks: the same, for the breakdown
+    pack_text: str | None = None  # set by propose_pack: the pack is sent as a file
 
 
 def _simple(name: str, description: str, field: str, field_doc: str) -> FunctionSpec:
@@ -102,6 +110,58 @@ RUN_SPECS = (
                 "assumptions": {"type": "array", "items": {"type": "string"}},
             },
             "required": ["how_it_looks", "criteria", "out_of_scope"],
+        },
+    ),
+    FunctionSpec(
+        "propose_tasks",
+        "Show the person the breakdown of the agreed spec into vertical slices. Each slice names "
+        "the earlier slices that block it and the criteria numbers it closes. Saved only when "
+        "the person presses the button.",
+        {
+            "type": "object",
+            "properties": {
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "what": {"type": "string"},
+                            "blocked_by": {"type": "array", "items": {"type": "integer"}},
+                            "criteria": {"type": "array", "items": {"type": "integer"}},
+                        },
+                        "required": ["title", "what"],
+                    },
+                }
+            },
+            "required": ["tasks"],
+        },
+    ),
+    FunctionSpec(
+        "propose_pack",
+        "Hand over the 'do it yourself' pack for the agreed tasks: steps, rules for CLAUDE.md and "
+        "one prompt per task with goal, context, constraints and checks. No code blocks.",
+        {
+            "type": "object",
+            "properties": {
+                "steps": {"type": "array", "items": {"type": "string"}},
+                "rules": {"type": "array", "items": {"type": "string"}},
+                "prompts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "task": {"type": "integer"},
+                            "goal": {"type": "string"},
+                            "context": {"type": "string"},
+                            "constraints": {"type": "string"},
+                            "checks": {"type": "string"},
+                        },
+                        "required": ["task", "goal", "context", "constraints", "checks"],
+                    },
+                },
+            },
+            "required": ["steps", "rules", "prompts"],
         },
     ),
 )
@@ -194,6 +254,26 @@ class ToolRegistry:
         except SpecError as exc:
             return ToolOutput(f"spec rejected, fix and call propose_spec again: {exc}")
         return ToolOutput("the spec is shown to the person with the buttons", spec_text=text)
+
+    async def _propose_tasks(self, arguments: dict, scope: RunScope) -> ToolOutput:
+        run = await scope.service.get(scope.tenant, scope.run_id)
+        if run is None:
+            return ToolOutput("the skill run is gone")
+        try:
+            text = await scope.service.propose_tasks(scope.tenant, run, arguments)
+        except TaskError as exc:
+            return ToolOutput(f"tasks rejected, fix and call propose_tasks again: {exc}")
+        return ToolOutput("the breakdown is shown to the person with the buttons", tasks_text=text)
+
+    async def _propose_pack(self, arguments: dict, scope: RunScope) -> ToolOutput:
+        run = await scope.service.get(scope.tenant, scope.run_id)
+        if run is None:
+            return ToolOutput("the skill run is gone")
+        try:
+            text = await scope.service.build_pack(scope.tenant, run, arguments)
+        except TaskError as exc:
+            return ToolOutput(f"pack rejected, fix and call propose_pack again: {exc}")
+        return ToolOutput("the pack is sent to the person as a file", pack_text=text)
 
     async def _ask_options(self, arguments: dict) -> ToolOutput:
         try:

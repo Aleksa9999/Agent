@@ -200,3 +200,44 @@ spec_saved: The spec is saved.
 spec_agreed_text: The spec is agreed and saved. Go on.
 spec_fix_text: The spec needs fixing. Ask what exactly is wrong and propose a new one.
 decision_unknown_why: 'after your “I don''t know”: the recommended option was taken'
+tasks_title: Tasks of the skill “{title}”
+tasks_item: '{n}. {title}'
+tasks_blocked: 'Blocked by: {tasks}'
+tasks_blocked_none: 'Blocked by: nothing, can start at once'
+tasks_what: 'Gives: {text}'
+tasks_closes: 'Closes: {criteria}'
+tasks_closes_none: 'Closes: none (preparation)'
+tasks_k: C
+tasks_cov_head: Coverage map of the criteria
+tasks_cov_line: C{k} → {tasks}
+tasks_uncovered_head: Not closed by anything
+tasks_uncovered_line: 'C{k}: {text}'
+tasks_aware_ask: Is this a conscious decision or a gap? If a gap, we add a slice.
+tasks_ask: Do you agree with this breakdown? I do not save it until you press a button.
+tasks_agree: Agree
+tasks_aware: Conscious, agree
+tasks_fix: Fix
+tasks_add: Add a slice
+tasks_saved: The breakdown is saved.
+tasks_agreed_text: The breakdown is agreed and saved, the estimate is shown. Make the “do it yourself” prompt pack.
+tasks_fix_text: The breakdown needs fixing. Ask what exactly is wrong and propose a new one.
+tasks_add_text: A slice is needed for the criteria that nothing closes. Propose a new breakdown.
+tasks_aware_question: Criteria {criteria} are not closed by any slice
+tasks_aware_decision: consciously left without a slice
+tasks_estimate_intro: 'Estimate for this breakdown. Prices come from the model catalog only:'
+pack_title: '“Do it yourself” pack: {title}'
+pack_h_steps: Order of work
+pack_h_rules: Rules for your Claude Code (put them into CLAUDE.md)
+pack_h_checklist: Result checklist
+pack_h_prompts: Prompts by slice
+pack_rule_secrets: Do not paste keys and passwords into prompts or project files; keep them in .env.
+pack_rule_scope: Do only what the slice describes and run the checks after every slice.
+pack_check_line: '[ ] C{k}. {text}'
+pack_prompt_head: 'Slice {n}: {title}'
+pack_goal: 'Goal: {text}'
+pack_context: 'Context: {text}'
+pack_constraints: 'Constraints: {text}'
+pack_checks: 'Checks: {text}'
+pack_caption: The “do it yourself” prompt pack for the skill “{title}”.
+pack_done: 'The pack is ready. Work through it on your side, and when you have a result on your own task, bring it here: I check it against the criteria.'
+pack_filename: skill-pack
