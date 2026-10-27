@@ -20,12 +20,14 @@ from app.db.tenants_sync import sync_tenants
 from app.i18n import Translator
 from app.logging_setup import setup_logging
 from app.miniapp_api.auth import InvalidInitDataError, TelegramUser, verify_init_data
+from app.miniapp_api.home import register_home_routes
 from app.miniapp_api.profile import register_profile_routes
 from app.profile.passport import PassportStore
 from app.profile.store import ProfileStore
 from app.skills.catalog import catalog_view
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
+from app.track.store import FirstResultStore, UserSkillStore
 
 log = logging.getLogger("app")
 Check = Callable[[], None]
@@ -100,6 +102,8 @@ def create_app(
                     skills=skill_store(),
                     profiles=ProfileStore(engine),
                     passports=PassportStore(engine),
+                    user_skills=UserSkillStore(engine),
+                    first_results=FirstResultStore(engine),
                 )
             )
         return runtimes[0]
@@ -159,6 +163,8 @@ def create_app(
     register_profile_routes(
         app, authenticate=authenticate, get_runtime=get_runtime, settings=settings
     )
+
+    register_home_routes(app, authenticate=authenticate, get_runtime=get_runtime, settings=settings)
 
     @app.get("/api/miniapp/{tenant_id}/catalog")
     def miniapp_catalog(tenant_id: str, request: Request) -> JSONResponse:

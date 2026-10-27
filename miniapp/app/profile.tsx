@@ -17,11 +17,11 @@ import {
 import { type Locale, type MessageKey, t, tByName } from "@/lib/messages";
 import { type RecordError, type Recording, browserMicSupport, recordError, startRecording } from "@/lib/recorder";
 
-type Props = { locale: Locale; initData: string; tenant: string };
+type Props = { locale: Locale; initData: string; tenant: string; onConfirmed?: () => void };
 type Screen = "start" | "record" | "questions";
 type Rec = "idle" | "recording" | "sending";
 
-export function ProfileScreen({ locale, initData, tenant }: Props) {
+export function ProfileScreen({ locale, initData, tenant, onConfirmed }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [failed, setFailed] = useState(false);
   const [screen, setScreen] = useState<Screen>("start");
@@ -67,6 +67,7 @@ export function ProfileScreen({ locale, initData, tenant }: Props) {
         profile={profile}
         initData={initData}
         tenant={tenant}
+        onConfirmed={() => onConfirmed?.()}
         onChange={(result) => {
           if (result.kind === "ready") {
             setProfile(result.profile);
@@ -364,6 +365,7 @@ function Card(props: {
   profile: Profile;
   initData: string;
   tenant: string;
+  onConfirmed: () => void;
   onChange: (result: ProfileResult) => boolean;
 }) {
   const { locale, profile } = props;
@@ -410,7 +412,14 @@ function Card(props: {
             <button
               type="button"
               disabled={busy}
-              onClick={() => void run(confirmProfile(props.initData, props.tenant))}
+              onClick={() =>
+                void run(
+                  confirmProfile(props.initData, props.tenant).then((result) => {
+                    if (result.kind === "ready") props.onConfirmed();
+                    return result;
+                  }),
+                )
+              }
               className={primary}
             >
               {t(locale, "card_ok")}

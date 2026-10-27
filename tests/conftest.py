@@ -18,6 +18,7 @@ from app.profile.passport import PassportStore
 from app.profile.store import ProfileStore
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
+from app.track.store import FirstResultStore, UserSkillStore
 from tests.fake_telegram import GROUP_ID, FakeSession
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -107,8 +108,25 @@ def passport_store(engine) -> PassportStore:
 
 
 @pytest.fixture
+def user_skill_store(engine) -> UserSkillStore:
+    return UserSkillStore(engine)
+
+
+@pytest.fixture
+def first_result_store(engine) -> FirstResultStore:
+    return FirstResultStore(engine)
+
+
+@pytest.fixture
 def make_runtime(
-    settings: Settings, engine, session: FakeSession, skill_store, profile_store, passport_store
+    settings: Settings,
+    engine,
+    session: FakeSession,
+    skill_store,
+    profile_store,
+    passport_store,
+    user_skill_store,
+    first_result_store,
 ):
     """Builds a runtime; the model and the speech recogniser are scripted per test."""
 
@@ -124,6 +142,8 @@ def make_runtime(
             skills=skill_store,
             profiles=profile_store,
             passports=passport_store,
+            user_skills=user_skill_store,
+            first_results=first_result_store,
             bot_factory=lambda tenant_id: bot,
             model_factory=lambda tenant_id: model,
             asr_factory=lambda tenant_id: asr,

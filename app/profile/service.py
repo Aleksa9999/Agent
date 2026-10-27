@@ -28,6 +28,7 @@ from app.profile.fields import (
 )
 from app.profile.passport import PassportRow, PassportStore, Publisher, fingerprint
 from app.profile.store import ProfileStore
+from app.track.service import TrackService
 
 log = logging.getLogger("app.profile")
 SAVE_ATTEMPTS = 4
@@ -82,7 +83,9 @@ class ProfileService:
         passports: PassportStore | None = None,
         publisher: Publisher | None = None,
         privacy_path: Path = Path("config/privacy_patterns.yaml"),
+        tracks: TrackService | None = None,
     ):
+        self.tracks = tracks
         self.passports = passports
         self.publisher = publisher
         self.privacy_path = privacy_path
@@ -316,8 +319,14 @@ class ProfileService:
             ],
             "public": [{"label": label, "text": text} for label, text in public],
         }
+        plan = self.tracks.plan(answers) if self.tracks is not None else None
+        if plan is not None:  # the track and its skills are part of the passport
+            snapshot["track"] = plan.track
+            snapshot["skills"] = [*plan.skills, *([plan.extra] if plan.extra else [])]
         before = await asyncio.to_thread(self.passports.latest, tenant, user_id)
         passport = await asyncio.to_thread(self.passports.create, tenant, user_id, snapshot, digest)
+        if plan is not None and self.tracks is not None:
+            await self.tracks.assign(tenant, user_id, plan)  # repeatable: heals a failed attempt
         created = before is None or before.version != passport.version
         published = passport.group_message_id is not None
         if self.publisher is not None and (created or not published):

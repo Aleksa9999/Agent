@@ -144,7 +144,10 @@ async def test_right_creates_passport_v1_once_and_posts_the_public_card(
     assert card.chat_id == GROUP_ID and card.message_thread_id == 101  # the person's own topic
     assert "Профиль участника: Anna" in card.text and "• Кто:" in card.text
     snapshot = passport_store.latest("default", user_id).data
-    assert set(snapshot) == {"fields", "card", "public"} and "role" in snapshot["fields"]
+    assert (
+        set(snapshot) == {"fields", "card", "public", "track", "skills"}
+        and "role" in snapshot["fields"]
+    )
 
 
 async def test_two_simultaneous_confirmations_make_one_passport(runtime, user_id, passport_store):

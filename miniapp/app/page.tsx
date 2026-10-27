@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type Locale, type MessageKey, pickLocale, t } from "@/lib/messages";
 import { CatalogScreen } from "./catalog";
+import { HomeScreen } from "./home";
 import { ProfileScreen } from "./profile";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
 
@@ -24,6 +25,7 @@ declare global {
 export default function Home() {
   const [state, setState] = useState<SessionState>({ kind: "loading" });
   const [locale, setLocale] = useState<Locale>("ru");
+  const [homeKey, setHomeKey] = useState(0);
 
   const open = useCallback(async () => {
     setState({ kind: "loading" });
@@ -57,7 +59,14 @@ export default function Home() {
             title={t(locale, "hello", { name: state.user.first_name })}
             body={t(locale, "ready_body")}
           />
+          <HomeScreen
+            locale={locale}
+            initData={window.Telegram?.WebApp?.initData ?? ""}
+            tenant={tenantFromSearch(window.location.search)}
+            refreshKey={homeKey}
+          />
           <ProfileScreen
+            onConfirmed={() => setHomeKey((key) => key + 1)}
             locale={locale}
             initData={window.Telegram?.WebApp?.initData ?? ""}
             tenant={tenantFromSearch(window.location.search)}

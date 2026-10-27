@@ -148,3 +148,38 @@ class Passport(TenantMixin, Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     group_message_id: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class UserSkill(TenantMixin, Base):
+    """A skill in a person's tree. unverified: suggested, not proven (no counter, no experience);
+    verified: passed the test, a real result and the "It worked" button."""
+
+    __tablename__ = "user_skills"
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", "slug", name="uq_user_skill"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[str] = mapped_column(String(8), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="unverified")
+    source: Mapped[str] = mapped_column(String(12), nullable=False, default="track")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FirstResult(TenantMixin, Base):
+    """The first useful result of the entrance (routine table, idea card or first plan)."""
+
+    __tablename__ = "first_results"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "user_id", "passport_version", name="uq_first_result"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    passport_version: Mapped[int] = mapped_column(nullable=False)
+    track: Mapped[str] = mapped_column(String(16), nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    code: Mapped[str | None] = mapped_column(Text)
+    seconds: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

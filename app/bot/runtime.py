@@ -30,6 +30,8 @@ from app.profile.store import ProfileStore
 from app.ratelimit import RateLimiter
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
+from app.track.service import FirstResultService, HomeService, TrackService
+from app.track.store import FirstResultStore, UserSkillStore
 
 log = logging.getLogger("app.bot")
 
@@ -46,6 +48,8 @@ class BotRuntime:
         skills: SkillStore | None = None,
         profiles: ProfileStore | None = None,
         passports: PassportStore | None = None,
+        user_skills: UserSkillStore | None = None,
+        first_results: FirstResultStore | None = None,
         asr_factory: Callable[[str], AsrPort | None] | None = None,
         bot_factory: Callable[[str], Bot] | None = None,
         model_factory: Callable[[str], ModelPort | None] | None = None,
@@ -58,6 +62,11 @@ class BotRuntime:
         self.skills = skills
         self.profiles = profiles
         self.passports = passports
+        self.user_skills = user_skills
+        self.first_results = first_results
+        self.first_result_limiter = RateLimiter(limit=3, window_seconds=600)
+        self._homes: dict[str, HomeService] = {}
+        self._first: dict[str, FirstResultService] = {}
         self._asr_factory = asr_factory or self._default_asr_factory
         self._profile_services: dict[str, ProfileService] = {}
         self._voice: dict[str, VoiceIntake] = {}
@@ -114,8 +123,48 @@ class BotRuntime:
                 if self.passports is not None
                 else None,
                 privacy_path=self.settings.privacy_patterns_path,
+                tracks=self._tracks(),
             )
         return self._profile_services[tenant_id]
+
+    def _tracks(self) -> TrackService | None:
+        if self.skills is None or self.user_skills is None:
+            return None
+        return TrackService(skills=self.skills, user_skills=self.user_skills)
+
+    def _track_stores_ready(self) -> bool:
+        return all(
+            x is not None
+            for x in (self.passports, self.user_skills, self.first_results, self.skills)
+        )
+
+    def home(self, tenant_id: str) -> HomeService | None:
+        """The "My Googlagent" screen; None when the stores were not given."""
+        if not self._track_stores_ready():
+            return None
+        if tenant_id not in self._homes:
+            profile = self.profile(tenant_id)
+            self._homes[tenant_id] = HomeService(
+                passports=self.passports,  # type: ignore[arg-type]
+                user_skills=self.user_skills,  # type: ignore[arg-type]
+                skills=self.skills,  # type: ignore[arg-type]
+                results=self.first_results,  # type: ignore[arg-type]
+                voice_available=bool(profile and profile.voice_available),
+            )
+        return self._homes[tenant_id]
+
+    def first_result(self, tenant_id: str) -> FirstResultService | None:
+        if not self._track_stores_ready():
+            return None
+        if tenant_id not in self._first:
+            self._first[tenant_id] = FirstResultService(
+                passports=self.passports,  # type: ignore[arg-type]
+                results=self.first_results,  # type: ignore[arg-type]
+                translator=self.translator,
+                prompts_dir=self.settings.prompts_dir,
+                model=self._model_factory(tenant_id),
+            )
+        return self._first[tenant_id]
 
     def voice(self, tenant_id: str) -> VoiceIntake | None:
         profile = self.profile(tenant_id)
