@@ -198,9 +198,6 @@ class OnboardingService:
         async with self._lock((self.tenant_id, user.id)):
             row = await self.upsert_user(user)
             await self.repo.update_user(row.id, dm_chat_id=chat_id)
-            if row.dm_topics_supported is False:
-                await self._send_project_picker(chat_id, "dm_topics_unavailable")
-                return
             created: dict[str, int] = {}
             for kind in DM_KINDS:
                 if await self.repo.get_topic(self.tenant_id, row.id, kind):
@@ -210,7 +207,10 @@ class OnboardingService:
                         chat_id=chat_id, name=self.t(f"topic_{kind}")
                     )
                 except (TelegramBadRequest, TelegramForbiddenError) as exc:
-                    log.info("private topics unavailable: %s", type(exc).__name__)
+                    # not remembered for good: threaded mode may be switched on later
+                    log.warning(
+                        "private topics unavailable: %s: %s", type(exc).__name__, exc.message
+                    )
                     await self.repo.update_user(row.id, dm_topics_supported=False)
                     await self._send_project_picker(chat_id, "dm_topics_unavailable")
                     return

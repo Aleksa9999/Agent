@@ -86,6 +86,23 @@ async def test_clients_without_private_topics_fall_back_to_the_project_command(r
     assert user.active_context == "dm_project" and user.dm_topics_supported is False
 
 
+async def test_topics_are_retried_after_the_owner_switches_threaded_mode_on(runtime, session):
+    session.private_topics_supported = False
+    await runtime.feed("default", command_update(BORIS, "/start"))
+    assert session.of("createForumTopic") == [] or "/project" in session.of("sendMessage")[-1].text
+
+    session.private_topics_supported = True  # threaded mode was enabled in BotFather
+    await runtime.feed("default", command_update(BORIS, "/start"))
+    assert [t.name for t in session.of("createForumTopic")][-4:] == [
+        "Профиль",
+        "Навыки",
+        "Проект",
+        "Отчёты",
+    ]
+    user = await runtime.repo.get_user("default", BORIS["id"])
+    assert user.dm_topics_supported is True
+
+
 async def test_old_or_unknown_buttons_explain_instead_of_failing(runtime, session):
     for data in ("v0:ctx:dm_profile", "garbage", "v1:ctx:dm_unknown", "v1:ctx:dm_profile"):
         await runtime.feed("default", callback_update(person(55, "Nobody", None), data))
