@@ -23,7 +23,7 @@ bash deploy/bootstrap-server.sh check      # memory, disk, system: stops if the 
 bash deploy/bootstrap-server.sh install    # Docker, Nginx, certbot, firewall (22, 80, 443)
 bash deploy/bootstrap-server.sh env        # random passwords; asks for the bot token and ids (hidden)
 bash deploy/bootstrap-server.sh up         # builds and starts the stack, waits for /health
-bash deploy/bootstrap-server.sh nginx app.example.com you@example.com   # needs the DNS record first
+bash deploy/bootstrap-server.sh nginx app.example.com [you@example.com]   # needs the DNS record first; email is optional
 bash deploy/bootstrap-server.sh webhook    # registers the Telegram webhook and menus
 ```
 

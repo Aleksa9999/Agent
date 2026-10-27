@@ -4,7 +4,7 @@
 #   bash deploy/bootstrap-server.sh install          Docker, Nginx, certbot, firewall (22, 80, 443 only)
 #   bash deploy/bootstrap-server.sh env              create .env.test (random passwords, asks for the rest)
 #   bash deploy/bootstrap-server.sh up               build and start the test stack, wait for /health
-#   bash deploy/bootstrap-server.sh nginx DOMAIN EMAIL   site config and a TLS certificate
+#   bash deploy/bootstrap-server.sh nginx DOMAIN [EMAIL]   site config and a TLS certificate (email is optional)
 #   bash deploy/bootstrap-server.sh webhook          register the Telegram webhook and menus
 # Secrets are typed with hidden input and written only to .env.test (mode 600). Nothing prints them.
 set -euo pipefail
@@ -150,7 +150,7 @@ up() {
 
 nginx_site() {
   local domain="${1:-}" email="${2:-}"
-  [[ -n "${domain}" && -n "${email}" ]] || fail "usage: nginx DOMAIN EMAIL"
+  [[ -n "${domain}" ]] || fail "usage: nginx DOMAIN [EMAIL]"
   [[ "${domain}" =~ ^[a-zA-Z0-9.-]+$ ]] || fail "the domain looks wrong"
   cat > /etc/nginx/sites-available/googlagent <<CONF
 server {
@@ -176,7 +176,12 @@ CONF
   rm -f /etc/nginx/sites-enabled/default
   nginx -t
   systemctl reload nginx
-  certbot --nginx -d "${domain}" -m "${email}" --agree-tos --no-eff-email -n --redirect
+  if [[ -n "${email}" ]]; then
+    certbot --nginx -d "${domain}" -m "${email}" --agree-tos --no-eff-email -n --redirect
+  else
+    # no email: the certificate works the same, only renewal reminders are not sent
+    certbot --nginx -d "${domain}" --register-unsafely-without-email --agree-tos -n --redirect
+  fi
   say "https is on for ${domain}"
 }
 
