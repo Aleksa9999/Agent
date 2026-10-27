@@ -93,5 +93,17 @@
   "field_ai_level": "Work with AI",
   "field_tech_depth": "Technical depth",
   "field_country": "Country and language",
-  "answer_unknown": "don't know"
+  "answer_unknown": "don't know",
+  "card_title": "Profile card",
+  "card_intro": "Check that everything is right. After “Right” I create your agent passport.",
+  "card_ok": "Right",
+  "card_fix": "Fix",
+  "card_fix_pick": "What to fix?",
+  "card_cancel": "Cancel",
+  "card_private_note": "Time, budget and country stay with you only and never go to the group.",
+  "passport_done": "Agent passport v{version} is created.",
+  "passport_old": "Agent passport v{version} exists, but the card has changed. Confirm the new version.",
+  "passport_published": "The public part, without money, contacts and age, is posted in your topic in the group.",
+  "passport_not_published": "Nothing is posted to the group: you are not there yet or the post failed.",
+  "card_error": "It was not saved. Please try again."
 }

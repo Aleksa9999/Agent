@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { goBack, loadProfile, sendAnswer, sendVoice } from "./profile";
+import { confirmProfile, editLine, goBack, loadProfile, sendAnswer, sendVoice } from "./profile";
 import { detectMic, pickMime, recordError } from "./recorder";
 
 const reply = (status: number, body: unknown = {}) =>
@@ -68,5 +68,23 @@ describe("microphone", () => {
     expect(pickMime((type) => type === "audio/mp4")).toBe("audio/mp4");
     expect(pickMime(() => true)).toBe("audio/webm;codecs=opus");
     expect(pickMime(() => false)).toBeUndefined();
+  });
+});
+
+describe("card actions", () => {
+  it("confirms and returns the profile with the new passport", async () => {
+    const profile = { status: "complete", card: { lines: [], passport: { version: 1, current: true, published: true } } };
+    const fetchFn = reply(200, { confirm: { version: 1, created: true, published: true }, profile });
+    expect(await confirmProfile("a=1", "acme", fetchFn)).toEqual({ kind: "ready", profile });
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/miniapp/acme/profile/confirm");
+    expect(await confirmProfile("a=1", "acme", reply(409))).toEqual({ kind: "stale" });
+    expect(await confirmProfile("a=1", "acme", reply(500))).toEqual({ kind: "error" });
+  });
+
+  it("asks to fix one line of the card", async () => {
+    const fetchFn = reply(200, { status: "complete" });
+    await editLine("a=1", "default", "resources", fetchFn);
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ line: "resources" });
+    expect(await editLine("a=1", "default", "zzz", reply(422))).toEqual({ kind: "rejected" });
   });
 });

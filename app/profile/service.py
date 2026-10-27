@@ -12,6 +12,7 @@ from app.agent.model import ModelError, ModelPort
 from app.i18n import Translator
 from app.profile import flow
 from app.profile.asr import AsrError, AsrPort
+from app.profile.card import card_lines, line_fields, public_lines
 from app.profile.extract import clean_text, extract_profile
 from app.profile.fields import (
     CUSTOM_LIMIT,
@@ -25,6 +26,7 @@ from app.profile.fields import (
     relevant_total,
     star_index,
 )
+from app.profile.passport import PassportRow, PassportStore, Publisher, fingerprint
 from app.profile.store import ProfileStore
 
 log = logging.getLogger("app.profile")
@@ -49,6 +51,18 @@ class InvalidAnswerError(ValueError):
         self.reason = reason
 
 
+class NotReadyError(Exception):
+    """The profile is not complete (or a question is open): there is nothing to confirm yet."""
+
+
+@dataclass(frozen=True)
+class ConfirmResult:
+    view: dict
+    version: int
+    created: bool  # False when the same profile was already confirmed
+    published: bool  # the public card is in the group topic
+
+
 @dataclass(frozen=True)
 class HearResult:
     outcome: str
@@ -65,7 +79,13 @@ class ProfileService:
         prompts_dir: Path,
         model: ModelPort | None = None,
         asr: AsrPort | None = None,
+        passports: PassportStore | None = None,
+        publisher: Publisher | None = None,
+        privacy_path: Path = Path("config/privacy_patterns.yaml"),
     ):
+        self.passports = passports
+        self.publisher = publisher
+        self.privacy_path = privacy_path
         self.store = store
         self.tr = translator
         self.prompts_dir = prompts_dir
@@ -83,9 +103,17 @@ class ProfileService:
     async def view(self, tenant: str, user_id: int) -> dict:
         data = await asyncio.to_thread(self.store.load, tenant, user_id)
         state = flow.ensure(data.state, data.answers)
-        return self._view(tenant, data.answers, state)
+        return await self._present(tenant, user_id, data.answers, state)
 
-    def _view(self, tenant: str, answers: Answers, state: dict) -> dict:
+    async def _present(self, tenant: str, user_id: int, answers: Answers, state: dict) -> dict:
+        passport = None
+        if self.passports is not None and not missing(answers) and answers:
+            passport = await asyncio.to_thread(self.passports.latest, tenant, user_id)
+        return self._view(tenant, answers, state, passport)
+
+    def _view(
+        self, tenant: str, answers: Answers, state: dict, passport: PassportRow | None = None
+    ) -> dict:
         todo = missing(answers)
         question = None
         position = None
@@ -96,7 +124,23 @@ class ProfileService:
         total = relevant_total(answers)
         done = total - len(todo)
         status = "new" if not answers else "complete" if not todo else "collecting"
+        card = None
+        if status == "complete" and question is None:
+            card = {
+                "lines": [
+                    {"id": c.id, "label": c.label, "text": c.text}
+                    for c in card_lines(self.tr, tenant, answers)
+                ],
+                "passport": None
+                if passport is None
+                else {
+                    "version": passport.version,
+                    "current": passport.content_hash == fingerprint(answers),
+                    "published": passport.group_message_id is not None,
+                },
+            }
         return {
+            "card": card,
             "status": status,
             "answers": [
                 {"field": f, "kind": answers[f].kind, "text": answers[f].text}
@@ -160,7 +204,7 @@ class ProfileService:
                 self.store.save, tenant, user_id, answers, state, data.version
             )
             if saved:
-                return self._view(tenant, answers, state)
+                return await self._present(tenant, user_id, answers, state)
         raise RuntimeError("profile was changed too often at once")
 
     async def answer(
@@ -235,3 +279,54 @@ class ProfileService:
             number = ENUM_CODES[field].index(value) + 1
             return Answer("voice", self.t(tenant, f"pq_{field}_o{number}"), value)
         return Answer("voice", value)
+
+    # card, passport, edit -------------------------------------------------
+    async def edit(self, tenant: str, user_id: int, line_id: str) -> dict:
+        """ "Fix": reopen the questions of one card line; the old answers stay until replaced."""
+
+        def apply(answers: Answers, state: dict):
+            fields = line_fields(line_id, answers)
+            if not fields:
+                raise InvalidAnswerError("bad_line")
+            return answers, {
+                "batch": fields,
+                "size": len(fields),
+                "history": list(state.get("history", [])),
+            }
+
+        return await self._change(tenant, user_id, apply)
+
+    async def confirm(self, tenant: str, user_id: int, name: str) -> ConfirmResult:
+        """ "Right": write passport version n+1 (only if the profile changed) and post the public
+        card into the group topic."""
+        if self.passports is None:
+            raise NotReadyError("passports are not configured")
+        data = await asyncio.to_thread(self.store.load, tenant, user_id)
+        state = flow.ensure(data.state, data.answers)
+        if not data.answers or missing(data.answers) or flow.current(state) is not None:
+            raise NotReadyError("profile is not complete")
+        answers = data.answers
+        digest = fingerprint(answers)
+        public = public_lines(self.tr, tenant, answers, self.privacy_path)
+        snapshot = {
+            "fields": {f: a.to_json() for f, a in answers.items()},
+            "card": [
+                {"id": c.id, "text": c.text, "public": c.public}
+                for c in card_lines(self.tr, tenant, answers)
+            ],
+            "public": [{"label": label, "text": text} for label, text in public],
+        }
+        before = await asyncio.to_thread(self.passports.latest, tenant, user_id)
+        passport = await asyncio.to_thread(self.passports.create, tenant, user_id, snapshot, digest)
+        created = before is None or before.version != passport.version
+        published = passport.group_message_id is not None
+        if self.publisher is not None and (created or not published):
+            previous = await asyncio.to_thread(self.passports.last_message_id, tenant, user_id)
+            message_id = await self.publisher.publish(tenant, user_id, name, public, previous)
+            if message_id is not None:
+                await asyncio.to_thread(
+                    self.passports.set_message, tenant, user_id, passport.version, message_id
+                )
+                published = True
+        view = await self._present(tenant, user_id, answers, state)
+        return ConfirmResult(view, passport.version, created, published)

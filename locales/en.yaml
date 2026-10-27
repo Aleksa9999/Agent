@@ -157,3 +157,14 @@ pq_country_o1: Russia, Russian
 pq_country_o2: Another country, Russian
 pq_country_o3: Another country, English
 pq_country_o4: Russia, English
+card_role: Who
+card_goal_10w: Goal for 10 weeks
+card_goal_year: Goal for a year
+card_project: Project
+card_resources: Time and budget
+card_experience: Experience and interests
+card_ai: AI
+card_country: Country and language
+pf_unknown_text: don't know
+pass_public_header: 'Member profile: {name}'
+pass_public_line: '• {label}: {text}'

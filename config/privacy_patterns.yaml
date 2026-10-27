@@ -1,0 +1,22 @@
+# What must never reach the shared group topic: contacts, money and age.
+# A regular expression that matches a piece of text blocks that piece. Case is ignored.
+# Cautious on purpose: a blocked piece is only left out of the public card, the private card keeps it.
+contact:
+  - '[\w.+-]+@[\w-]+\.[\w.-]+'
+  - '(?<!\w)@\w{3,}'
+  - '\b(?:https?://|www\.|t\.me/|wa\.me/)\S+'
+  - '\b[\w-]+\.(?:ru|com|org|net|io|me|su|рф|app|dev|ai|info|biz)\b'
+  - '\+?\d[\d\s().-]{8,}\d'
+  - '\d{6,}'
+money:
+  - '\d[\d\s.,]*\s*(?:₽|\$|€|£|руб|р\.|тыс|млн|миллион|k\b|к\b|usd|eur|rub|долл|евро|коп|dollars?|euros?|thousand|million)'
+  - '(?:₽|\$|€|£)\s*\d'
+  - '\b(?:бюджет\w*|зарплат\w*|оклад\w*|выручк\w*|прибыл\w*|цен[ауые]\w*|стоимост\w*|оплат\w*|гонорар\w*|ставк\w*|budget|salary|revenue|profit|price|fee)\W{0,20}\d'
+  - '\b(?:рубл\w*|долл\w*|евро|копе\w+)\b'
+age:
+  - '\bмне\s+(?:уже\s+)?(?:\d|\w+\s+(?:лет|год))'
+  - '\b\d{1,3}\s*-?\s*(?:лет|год|года|летн\w*|y\.?o\b|years?)'
+  - '\bвозраст\w*'
+  - '\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty)\s*-?\s*years?\s*old\b'
+  - '\b(?:age|aged|years old)\b'
+  - '\b(?:одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят)\w*\s+(?:лет|года|год)\b'

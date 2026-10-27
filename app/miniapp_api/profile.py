@@ -13,7 +13,7 @@ from app.config import Settings
 from app.miniapp_api.auth import TelegramUser
 from app.profile import service as outcomes
 from app.profile.asr import MAX_AUDIO_BYTES, clean_mime
-from app.profile.service import InvalidAnswerError
+from app.profile.service import InvalidAnswerError, NotReadyError
 
 log = logging.getLogger("app.miniapp")
 Authenticate = Callable[[str, Request], TelegramUser | JSONResponse]
@@ -91,6 +91,41 @@ def register_profile_routes(
             return found
         user_id, profile, _ = found
         return _no_store(await profile.back(tenant_id, user_id))
+
+    @app.post("/api/miniapp/{tenant_id}/profile/confirm")
+    async def confirm(tenant_id: str, request: Request) -> JSONResponse:
+        """ "Right": passport version and the public card in the group topic."""
+        found = await context(tenant_id, request)
+        if isinstance(found, JSONResponse):
+            return found
+        user_id, profile, user = found
+        try:
+            result = await profile.confirm(tenant_id, user_id, user.first_name)
+        except NotReadyError:
+            return _no_store({"error": "not_ready"}, 409)
+        return _no_store(
+            {
+                "confirm": {
+                    "version": result.version,
+                    "created": result.created,
+                    "published": result.published,
+                },
+                "profile": result.view,
+            }
+        )
+
+    @app.post("/api/miniapp/{tenant_id}/profile/edit")
+    async def edit(tenant_id: str, request: Request) -> JSONResponse:
+        """ "Fix": reopen the questions of one card line."""
+        found = await context(tenant_id, request)
+        if isinstance(found, JSONResponse):
+            return found
+        user_id, profile, _ = found
+        try:
+            line = str((await request.json()).get("line", ""))[:32]
+            return _no_store(await profile.edit(tenant_id, user_id, line))
+        except (ValueError, AttributeError, InvalidAnswerError):
+            return _no_store({"error": "bad_request"}, 422)
 
     @app.post("/api/miniapp/{tenant_id}/profile/voice")
     async def voice(tenant_id: str, request: Request) -> JSONResponse:

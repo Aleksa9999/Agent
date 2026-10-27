@@ -7,6 +7,8 @@ import {
   type Profile,
   type ProfileResult,
   type Question,
+  confirmProfile,
+  editLine,
   goBack,
   loadProfile,
   sendAnswer,
@@ -58,7 +60,25 @@ export function ProfileScreen({ locale, initData, tenant }: Props) {
     );
   }
   if (!profile) return <p className="text-[var(--tg-hint)]">{t(locale, "loading")}</p>;
-  if (profile.status === "complete") return <Done locale={locale} profile={profile} />;
+  if (profile.card) {
+    return (
+      <Card
+        locale={locale}
+        profile={profile}
+        initData={initData}
+        tenant={tenant}
+        onChange={(result) => {
+          if (result.kind === "ready") {
+            setProfile(result.profile);
+            setScreen("questions");
+            return true;
+          }
+          if (result.kind === "stale") void load();
+          return false;
+        }}
+      />
+    );
+  }
 
   if (screen === "record") {
     return (
@@ -77,7 +97,7 @@ export function ProfileScreen({ locale, initData, tenant }: Props) {
       />
     );
   }
-  if (screen === "questions" && profile.question) {
+  if ((screen === "questions" || profile.status === "complete") && profile.question) {
     return (
       <Questions
         locale={locale}
@@ -339,19 +359,91 @@ function Questions(props: {
   );
 }
 
-function Done({ locale, profile }: { locale: Locale; profile: Profile }) {
+function Card(props: {
+  locale: Locale;
+  profile: Profile;
+  initData: string;
+  tenant: string;
+  onChange: (result: ProfileResult) => boolean;
+}) {
+  const { locale, profile } = props;
+  const card = profile.card as NonNullable<Profile["card"]>;
+  const [busy, setBusy] = useState(false);
+  const [fixing, setFixing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const passport = card.passport;
+
+  const run = async (job: Promise<ProfileResult>) => {
+    setBusy(true);
+    setFailed(false);
+    const ok = props.onChange(await job);
+    setBusy(false);
+    if (!ok) setFailed(true);
+  };
+
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-xl font-semibold">{t(locale, "done_title")}</h2>
-      <p className="text-[var(--tg-hint)]">{t(locale, "done_body")}</p>
+    <section className="flex flex-col gap-4" aria-busy={busy}>
+      <h2 className="text-xl font-semibold">{t(locale, "card_title")}</h2>
+      <p className="text-[var(--tg-hint)]">{t(locale, "card_intro")}</p>
       <dl className="flex flex-col gap-2 text-sm">
-        {profile.answers.map((item) => (
-          <div key={item.field} className="rounded-xl border border-[var(--tg-hint)]/30 px-4 py-3">
-            <dt className="text-[var(--tg-hint)]">{tByName(locale, `field_${item.field}`)}</dt>
-            <dd>{item.kind === "unknown" ? t(locale, "answer_unknown") : item.text}</dd>
+        {card.lines.map((line) => (
+          <div key={line.id} className="rounded-xl border border-[var(--tg-hint)]/30 px-4 py-3">
+            <dt className="text-[var(--tg-hint)]">{line.label}</dt>
+            <dd>{line.text}</dd>
           </div>
         ))}
       </dl>
+      <p className="text-xs text-[var(--tg-hint)]">{t(locale, "card_private_note")}</p>
+      {passport && (
+        <div role="status" className="rounded-xl border border-[var(--tg-button)] px-4 py-3 text-sm">
+          <p className="font-medium">
+            {t(locale, passport.current ? "passport_done" : "passport_old", { version: String(passport.version) })}
+          </p>
+          <p className="text-[var(--tg-hint)]">
+            {t(locale, passport.published ? "passport_published" : "passport_not_published")}
+          </p>
+        </div>
+      )}
+      {!fixing ? (
+        <div className="flex gap-2">
+          {!passport?.current && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void run(confirmProfile(props.initData, props.tenant))}
+              className={primary}
+            >
+              {t(locale, "card_ok")}
+            </button>
+          )}
+          <button type="button" disabled={busy} onClick={() => setFixing(true)} className={secondary}>
+            {t(locale, "card_fix")}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="font-medium">{t(locale, "card_fix_pick")}</p>
+          {card.lines.map((line) => (
+            <button
+              key={line.id}
+              type="button"
+              disabled={busy}
+              onClick={() => void run(editLine(props.initData, props.tenant, line.id))}
+              className={choice}
+            >
+              {line.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => setFixing(false)} className={secondary}>
+            {t(locale, "card_cancel")}
+          </button>
+        </div>
+      )}
+      {failed && (
+        <p role="alert" className="text-sm">
+          {t(locale, "card_error")}
+        </p>
+      )}
     </section>
   );
 }

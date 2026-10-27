@@ -132,3 +132,19 @@ class Profile(TenantMixin, Base):
     state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     version: Mapped[int] = mapped_column(nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Passport(TenantMixin, Base):
+    """The agent passport: a snapshot of the confirmed profile. A change is a new version; old
+    versions stay. group_message_id is the public card posted in the person's group topic."""
+
+    __tablename__ = "passports"
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", "version", name="uq_passport"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(nullable=False)
+    data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    group_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

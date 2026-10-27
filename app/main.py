@@ -21,6 +21,7 @@ from app.i18n import Translator
 from app.logging_setup import setup_logging
 from app.miniapp_api.auth import InvalidInitDataError, TelegramUser, verify_init_data
 from app.miniapp_api.profile import register_profile_routes
+from app.profile.passport import PassportStore
 from app.profile.store import ProfileStore
 from app.skills.catalog import catalog_view
 from app.skills.store import SkillStore
@@ -98,6 +99,7 @@ def create_app(
                     store=AgentStore(engine),
                     skills=skill_store(),
                     profiles=ProfileStore(engine),
+                    passports=PassportStore(engine),
                 )
             )
         return runtimes[0]

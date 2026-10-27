@@ -14,6 +14,7 @@ from app.config import Settings
 from app.db.base import Base, Tenant
 from app.db.session import enable_sqlite_foreign_keys
 from app.i18n import Translator
+from app.profile.passport import PassportStore
 from app.profile.store import ProfileStore
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
@@ -61,6 +62,7 @@ def settings(tmp_path: Path, tenants_dir: Path) -> Settings:
         tenants_dir=tenants_dir,
         locales_dir=ROOT / "locales",
         database_url=os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{tmp_path / 'bot.db'}",
+        privacy_patterns_path=ROOT / "config" / "privacy_patterns.yaml",
         group_chat_id=GROUP_ID,
         owner_tg_id=OWNER_ID,
         tg_webhook_secret=WEBHOOK_SECRET,
@@ -100,7 +102,14 @@ def profile_store(engine) -> ProfileStore:
 
 
 @pytest.fixture
-def make_runtime(settings: Settings, engine, session: FakeSession, skill_store, profile_store):
+def passport_store(engine) -> PassportStore:
+    return PassportStore(engine)
+
+
+@pytest.fixture
+def make_runtime(
+    settings: Settings, engine, session: FakeSession, skill_store, profile_store, passport_store
+):
     """Builds a runtime; the model and the speech recogniser are scripted per test."""
 
     def build(model=None, asr=None) -> BotRuntime:
@@ -114,6 +123,7 @@ def make_runtime(settings: Settings, engine, session: FakeSession, skill_store, 
             store=AgentStore(engine),
             skills=skill_store,
             profiles=profile_store,
+            passports=passport_store,
             bot_factory=lambda tenant_id: bot,
             model_factory=lambda tenant_id: model,
             asr_factory=lambda tenant_id: asr,

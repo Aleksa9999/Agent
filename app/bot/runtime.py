@@ -16,6 +16,7 @@ from app.agent.store import AgentStore
 from app.agent.tools import ToolRegistry
 from app.bot.chat import AgentChat
 from app.bot.handlers import build_router
+from app.bot.publisher import GroupPublisher
 from app.bot.repo import BotRepo
 from app.bot.roles import RoleRegistry
 from app.bot.service import OnboardingService
@@ -23,6 +24,7 @@ from app.bot.voice import VoiceIntake
 from app.config import Settings
 from app.i18n import Translator
 from app.profile.asr import AsrPort, QwenAsrClient
+from app.profile.passport import PassportStore
 from app.profile.service import ProfileService
 from app.profile.store import ProfileStore
 from app.ratelimit import RateLimiter
@@ -43,6 +45,7 @@ class BotRuntime:
         store: AgentStore,
         skills: SkillStore | None = None,
         profiles: ProfileStore | None = None,
+        passports: PassportStore | None = None,
         asr_factory: Callable[[str], AsrPort | None] | None = None,
         bot_factory: Callable[[str], Bot] | None = None,
         model_factory: Callable[[str], ModelPort | None] | None = None,
@@ -54,6 +57,7 @@ class BotRuntime:
         self.store = store
         self.skills = skills
         self.profiles = profiles
+        self.passports = passports
         self._asr_factory = asr_factory or self._default_asr_factory
         self._profile_services: dict[str, ProfileService] = {}
         self._voice: dict[str, VoiceIntake] = {}
@@ -103,6 +107,13 @@ class BotRuntime:
                 prompts_dir=self.settings.prompts_dir,
                 model=self._model_factory(tenant_id),
                 asr=self._asr_factory(tenant_id),
+                passports=self.passports,
+                publisher=GroupPublisher(
+                    self.service(tenant_id), self.settings.privacy_patterns_path
+                )
+                if self.passports is not None
+                else None,
+                privacy_path=self.settings.privacy_patterns_path,
             )
         return self._profile_services[tenant_id]
 

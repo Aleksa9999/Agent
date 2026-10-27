@@ -10,7 +10,13 @@ export type Question = {
   options: Option[];
   selected: Selected | null;
 };
+export type CardLine = { id: string; label: string; text: string };
+export type Card = {
+  lines: CardLine[];
+  passport: { version: number; current: boolean; published: boolean } | null;
+};
 export type Profile = {
+  card: Card | null;
   status: "new" | "collecting" | "complete";
   answers: { field: string; kind: string; text: string }[];
   progress: { answered: number; total: number };
@@ -124,3 +130,39 @@ export async function sendVoice(
     return { kind: "failed", reason: "network" };
   }
 }
+
+export const confirmProfile = (initData: string, tenant: string, fetchFn: Fetch = fetch) =>
+  requestConfirm(`${base(tenant)}/confirm`, initData, fetchFn);
+
+async function requestConfirm(url: string, initData: string, fetchFn: Fetch): Promise<ProfileResult> {
+  let response: Response;
+  try {
+    response = await fetchFn(url, {
+      method: "POST",
+      headers: { Authorization: `tma ${initData}` },
+      cache: "no-store",
+    });
+  } catch {
+    return { kind: "error" };
+  }
+  if (response.status === 409) return { kind: "stale" }; // not ready: reload and show the questions
+  if (!response.ok) return { kind: "error" };
+  try {
+    const body = (await response.json()) as { profile: Profile };
+    return { kind: "ready", profile: body.profile };
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+export const editLine = (initData: string, tenant: string, line: string, fetchFn: Fetch = fetch) =>
+  request(
+    `${base(tenant)}/edit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ line }),
+    },
+    initData,
+    fetchFn,
+  );
