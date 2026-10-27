@@ -22,10 +22,10 @@ check: lint test validate-skills miniapp-check
 
 # Test stack in Docker (the server). ENV_FILE defaults to .env.test, created from .env.example.
 stack-up:
-	docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml up -d --build
+	docker compose --env-file .env.test -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml up -d --build
 
 stack-down:
-	docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml down
+	docker compose --env-file .env.test -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml down
 
 # The same app on real PostgreSQL and Redis without Docker (development machines).
 native-up:

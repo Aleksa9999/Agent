@@ -14,12 +14,28 @@ This guide never contains secrets, server addresses or domains. Real values live
 
 Nginx and certbot run on the host (`deploy/nginx.conf` is the site template).
 
-## First start of the test stack (about 15 minutes)
+## Quick path on a fresh Ubuntu server (as root)
+
+```
+apt-get update && apt-get install -y git
+git clone https://github.com/Aleksa9999/Agent.git && cd Agent
+bash deploy/bootstrap-server.sh check      # memory, disk, system: stops if the server is too small
+bash deploy/bootstrap-server.sh install    # Docker, Nginx, certbot, firewall (22, 80, 443)
+bash deploy/bootstrap-server.sh env        # random passwords; asks for the bot token and ids (hidden)
+bash deploy/bootstrap-server.sh up         # builds and starts the stack, waits for /health
+bash deploy/bootstrap-server.sh nginx app.example.com you@example.com   # needs the DNS record first
+bash deploy/bootstrap-server.sh webhook    # registers the Telegram webhook and menus
+```
+
+The DNS record (type A) for the domain must point to this server before the `nginx` step.
+The manual version of the same steps follows.
+
+## First start of the test stack, manual version (about 15 minutes)
 
 1. Copy `.env.example` to `.env.test` and fill it, including `TG_WEBHOOK_SECRET`, `GROUP_CHAT_ID`, `OWNER_TG_ID` and `WEBAPP_URL` (the public https address of this server). For the agent set `QWEN_API_KEY` (the Model Studio key, International region), `QWEN_MODEL` and `QWEN_FAST_MODEL` (exact model ids from the Model Studio console; without them the agent answers that it is unavailable). Add two lines for the stack itself:
    `POSTGRES_PASSWORD=` and `REDIS_PASSWORD=` (long random values; enter them on the server, do not paste them into chats).
 2. `chmod 600 .env.test`.
-3. `make stack-up`.
+3. `make stack-up` (it passes `--env-file .env.test` to Docker Compose).
 4. `curl http://127.0.0.1:8000/health` must answer `{"status":"ok", ...}` and show both `db` and `redis` as `ok`.
 5. Copy `deploy/nginx.conf` to Nginx, replace `APP_DOMAIN`, run certbot, reload Nginx.
 6. Register the webhook and menus once: `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml exec bot-api python -m app.bot.setup`.

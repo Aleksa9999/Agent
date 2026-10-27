@@ -25,7 +25,7 @@ run() {
 case "$TARGET" in
   test)
     : "${PREV_TAG:?PREV_TAG is required (previous image tag)}"
-    FILES="${COMPOSE_FILES:--f deploy/docker-compose.yml -f deploy/docker-compose.test.yml}"
+    FILES="${COMPOSE_FILES:---env-file .env.test -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml}"
     # shellcheck disable=SC2086
     TAG="$PREV_TAG" run docker compose $FILES up -d --no-build
     echo "rollback ok: test stack on tag ${PREV_TAG}"
@@ -36,7 +36,7 @@ case "$TARGET" in
       echo "errors in over 10% of requests in 15 minutes, or wrong charges)" >&2
       exit 3
     fi
-    FILES="${COMPOSE_FILES:--f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml}"
+    FILES="${COMPOSE_FILES:---env-file .env.prod -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml}"
     UNIT="${V1_UNIT:-airobotbro-edu}"
     # shellcheck disable=SC2086
     run docker compose $FILES down
