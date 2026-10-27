@@ -92,3 +92,26 @@ class PendingQuestion(TenantMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="open")
     message_id: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SkillVersion(TenantMixin, Base):
+    """One version of one skill. Old versions stay: people may still work on them.
+
+    status: pending (uploaded, waiting for the owner), published (in the catalog), discarded.
+    origin: repo (content/skills) or upload (owner's /skill_upload)."""
+
+    __tablename__ = "skill_versions"
+    __table_args__ = (UniqueConstraint("tenant_id", "slug", "version", name="uq_skill_version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[str] = mapped_column(String(8), nullable=False)
+    branch: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False)
+    origin: Mapped[str] = mapped_column(String(8), nullable=False)
+    skill_md: Mapped[str] = mapped_column(Text, nullable=False)
+    test_yaml: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    uploaded_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

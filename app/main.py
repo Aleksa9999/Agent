@@ -19,7 +19,9 @@ from app.db.session import make_engine
 from app.db.tenants_sync import sync_tenants
 from app.i18n import Translator
 from app.logging_setup import setup_logging
-from app.miniapp_api.auth import InvalidInitDataError, verify_init_data
+from app.miniapp_api.auth import InvalidInitDataError, TelegramUser, verify_init_data
+from app.skills.catalog import catalog_view
+from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 
 log = logging.getLogger("app")
@@ -62,7 +64,19 @@ def create_app(
             sync_tenants(make_engine(settings), tenants)
         except Exception as exc:  # the app must still start: /health will show a broken database
             log.error("tenants were not synced: %s", type(exc).__name__)
+        try:
+            count = skill_store().sync_repo(settings.skills_dir, tenants.ids())
+            log.info("skills loaded from the repository: %d", count)
+        except Exception as exc:  # the catalog is empty until the next start, the app still works
+            log.error("skills were not loaded: %s", type(exc).__name__)
         yield
+
+    stores: list[SkillStore] = []
+
+    def skill_store() -> SkillStore:
+        if not stores:
+            stores.append(SkillStore(make_engine(settings)))
+        return stores[0]
 
     app = FastAPI(
         title="Googlagent", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
@@ -80,6 +94,7 @@ def create_app(
                     translator=Translator(settings.locales_dir, tenants),
                     repo=BotRepo(engine),
                     store=AgentStore(engine),
+                    skills=skill_store(),
                 )
             )
         return runtimes[0]
@@ -103,9 +118,8 @@ def create_app(
         }
         return JSONResponse(body, status_code=200 if ok else 503)
 
-    @app.post("/api/miniapp/{tenant_id}/session")
-    def miniapp_session(tenant_id: str, request: Request) -> JSONResponse:
-        """Opens a Mini App session. Only launch data signed by Telegram is accepted."""
+    def authenticate(tenant_id: str, request: Request) -> TelegramUser | JSONResponse:
+        """Only launch data signed by Telegram is accepted; returns the person or the error."""
         if tenant_id not in tenants.ids():
             return JSONResponse({"error": "unknown_tenant"}, status_code=404)
         token = tenants.bot_token(tenant_id, test=settings.app_env == "test")
@@ -115,11 +129,18 @@ def create_app(
         if scheme.lower() != "tma":
             return JSONResponse({"error": "missing"}, status_code=401)
         try:
-            user = verify_init_data(
+            return verify_init_data(
                 init_data, token, max_age_seconds=settings.miniapp_initdata_max_age
             )
         except InvalidInitDataError as exc:
             return JSONResponse({"error": exc.reason}, status_code=401)
+
+    @app.post("/api/miniapp/{tenant_id}/session")
+    def miniapp_session(tenant_id: str, request: Request) -> JSONResponse:
+        """Opens a Mini App session."""
+        user = authenticate(tenant_id, request)
+        if isinstance(user, JSONResponse):
+            return user
         tenant = tenants.get(tenant_id)
         role = RoleRegistry(settings.owner_tg_id).role_of(user.id)
         return JSONResponse(
@@ -129,6 +150,19 @@ def create_app(
                 "locale": tenant.locale,
             }
         )
+
+    @app.get("/api/miniapp/{tenant_id}/catalog")
+    def miniapp_catalog(tenant_id: str, request: Request) -> JSONResponse:
+        """The skill catalog: studio directions as cards and the branches of the tree."""
+        user = authenticate(tenant_id, request)
+        if isinstance(user, JSONResponse):
+            return user
+        try:
+            docs = skill_store().catalog(tenant_id)
+        except Exception as exc:  # a broken database must not look like an empty catalog
+            log.error("catalog was not read: %s", type(exc).__name__)
+            return JSONResponse({"error": "unavailable"}, status_code=503)
+        return JSONResponse(catalog_view(docs), headers={"Cache-Control": "no-store"})
 
     @app.post("/telegram/webhook/{tenant_id}")
     async def telegram_webhook(tenant_id: str, request: Request) -> JSONResponse:

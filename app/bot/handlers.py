@@ -10,7 +10,12 @@ from aiogram.types import CallbackQuery, ChatMemberUpdated, Message, MessageGene
 
 from app.bot import options_ui
 from app.bot.chat import AgentChat
-from app.bot.service import MINIAPP_LATER, OnboardingService, parse_context_callback
+from app.bot.service import (
+    MINIAPP_LATER,
+    OnboardingService,
+    parse_context_callback,
+    parse_skill_callback,
+)
 
 
 def build_router() -> Router:
@@ -46,6 +51,22 @@ def build_router() -> Router:
         if message.from_user and message.text:
             command = message.text.split()[0].lstrip("/").split("@")[0].lower()
             await svc.handle_owner_command(message.from_user, message.chat.id, command)
+
+    @router.message(Command("skill_upload"), private, ~F.document)
+    async def on_skill_upload(message: Message, svc: OnboardingService) -> None:
+        if message.from_user:
+            await svc.handle_skill_upload(message.from_user, message.chat.id)
+
+    @router.message(F.document, private)
+    async def on_document(message: Message, svc: OnboardingService) -> None:
+        if message.from_user and message.document:
+            await svc.handle_document(
+                message.from_user, message.chat.id, message.document, message.caption
+            )
+
+    @router.callback_query(F.data.func(lambda data: parse_skill_callback(data) is not None))
+    async def on_skill_button(query: CallbackQuery, svc: OnboardingService) -> None:
+        await svc.handle_skill_button(query)
 
     @router.callback_query(F.data.func(lambda data: parse_context_callback(data) is not None))
     async def on_context_button(query: CallbackQuery, svc: OnboardingService) -> None:

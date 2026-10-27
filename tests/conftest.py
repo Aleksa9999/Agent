@@ -14,6 +14,7 @@ from app.config import Settings
 from app.db.base import Base, Tenant
 from app.db.session import enable_sqlite_foreign_keys
 from app.i18n import Translator
+from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 from tests.fake_telegram import GROUP_ID, FakeSession
 
@@ -86,7 +87,16 @@ def session() -> FakeSession:
 
 
 @pytest.fixture
-def runtime(settings: Settings, engine, session: FakeSession) -> BotRuntime:
+def skill_store(settings: Settings, engine) -> SkillStore:
+    store = SkillStore(engine)
+    store.sync_repo(ROOT / "content" / "skills", ["default"])
+    return store
+
+
+@pytest.fixture
+def runtime(
+    settings: Settings, engine, session: FakeSession, skill_store: SkillStore
+) -> BotRuntime:
     tenants = TenantRegistry.load(settings.tenants_dir)
     bot = Bot(token="123456:TESTTOKEN", session=session)
     return BotRuntime(
@@ -95,6 +105,7 @@ def runtime(settings: Settings, engine, session: FakeSession) -> BotRuntime:
         translator=Translator(settings.locales_dir, tenants),
         repo=BotRepo(engine),
         store=AgentStore(engine),
+        skills=skill_store,
         bot_factory=lambda tenant_id: bot,
         model_factory=lambda tenant_id: None,
     )

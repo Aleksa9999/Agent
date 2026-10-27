@@ -21,6 +21,7 @@ from app.bot.roles import RoleRegistry
 from app.bot.service import OnboardingService
 from app.config import Settings
 from app.i18n import Translator
+from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 
 log = logging.getLogger("app.bot")
@@ -35,6 +36,7 @@ class BotRuntime:
         translator: Translator,
         repo: BotRepo,
         store: AgentStore,
+        skills: SkillStore | None = None,
         bot_factory: Callable[[str], Bot] | None = None,
         model_factory: Callable[[str], ModelPort | None] | None = None,
     ):
@@ -43,6 +45,7 @@ class BotRuntime:
         self.translator = translator
         self.repo = repo
         self.store = store
+        self.skills = skills
         self._model_factory = model_factory or self._default_model_factory
         self._chats: dict[str, AgentChat] = {}
         self._bot_factory = bot_factory or self._default_bot_factory
@@ -109,6 +112,7 @@ class BotRuntime:
                 roles=RoleRegistry(self.settings.owner_tg_id),
                 settings=self.settings,
                 tenant_id=tenant_id,
+                skills=self.skills,
             )
         return self._services[tenant_id]
 

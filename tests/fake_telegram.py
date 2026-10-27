@@ -18,6 +18,7 @@ class FakeSession(BaseSession):
         self.private_topics_supported = True
         self.drafts_supported = True
         self.known_chats: set[int] | None = None  # None: every chat is reachable
+        self.upload = b""  # what a download of any file returns
         self._thread = 100
         self._message = 0
 
@@ -25,8 +26,7 @@ class FakeSession(BaseSession):
         return None
 
     async def stream_content(self, *args: Any, **kwargs: Any) -> AsyncGenerator[bytes, None]:
-        raise NotImplementedError
-        yield b""  # pragma: no cover
+        yield self.upload
 
     def of(self, api_method: str) -> list[Any]:
         return [m for name, m in self.calls if name == api_method]
@@ -45,6 +45,8 @@ class FakeSession(BaseSession):
         result: Any = True
         if name == "getMe":
             result = {"id": 999, "is_bot": True, "first_name": "Bot", "username": BOT_USERNAME}
+        elif name == "getFile":
+            result = {"file_id": method.file_id, "file_unique_id": "u", "file_path": "docs/f.zip"}
         elif name == "createForumTopic":
             self._thread += 1
             result = {"message_thread_id": self._thread, "name": method.name, "icon_color": 0}
@@ -137,4 +139,22 @@ def text_update(user: dict, text: str, update_id: int = 5, thread_id: int | None
     }
     if thread_id is not None:
         message["message_thread_id"] = thread_id
+    return {"update_id": update_id, "message": message}
+
+
+def document_update(user: dict, size: int, caption: str | None = None, update_id: int = 6) -> dict:
+    message = {
+        "message_id": 4,
+        "date": 0,
+        "chat": {"id": user["id"], "type": "private"},
+        "from": user,
+        "document": {
+            "file_id": "doc1",
+            "file_unique_id": "u1",
+            "file_name": "skill.zip",
+            "file_size": size,
+        },
+    }
+    if caption:
+        message["caption"] = caption
     return {"update_id": update_id, "message": message}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { type Locale, type MessageKey, pickLocale, t } from "@/lib/messages";
+import { CatalogScreen } from "./catalog";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
 
 type TelegramWebApp = {
@@ -42,17 +43,24 @@ export default function Home() {
   );
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-5 py-8">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 py-8">
       {state.kind === "loading" && <p className="text-[var(--tg-hint)]">{t(locale, "loading")}</p>}
       {state.kind === "outside_telegram" && screen("outside_title", "outside_body")}
       {state.kind === "expired" && screen("expired_title", "expired_body")}
       {state.kind === "denied" && screen("denied_title", "denied_body")}
       {state.kind === "error" && screen("error_title", "error_body", true)}
       {state.kind === "ready" && (
-        <Message
-          title={t(locale, "hello", { name: state.user.first_name })}
-          body={t(locale, "ready_body")}
-        />
+        <>
+          <Message
+            title={t(locale, "hello", { name: state.user.first_name })}
+            body={t(locale, "ready_body")}
+          />
+          <CatalogScreen
+            locale={locale}
+            initData={window.Telegram?.WebApp?.initData ?? ""}
+            tenant={tenantFromSearch(window.location.search)}
+          />
+        </>
       )}
     </main>
   );

@@ -16,3 +16,9 @@ export function t(locale: Locale, key: MessageKey, values: Record<string, string
   }
   return text;
 }
+
+/** For keys built at run time (branch names). A missing key shows the key, never breaks the screen. */
+export function tByName(locale: Locale, key: string): string {
+  const catalog = catalogs[locale] as Record<string, string>;
+  return catalog[key] ?? key;
+}

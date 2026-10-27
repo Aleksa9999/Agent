@@ -4,6 +4,7 @@ Every Telegram call goes through the aiogram Bot, so tests can run the real hand
 recorded fake session. Every human-readable text comes from the translator.
 """
 
+import asyncio
 import logging
 import time
 
@@ -13,10 +14,13 @@ from aiogram.types import (
     BotCommand,
     BotCommandScopeChat,
     BotCommandScopeDefault,
+    CallbackQuery,
+    Document,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
     MenuButtonWebApp,
+    Message,
     ReplyKeyboardMarkup,
     User,
     WebAppInfo,
@@ -26,6 +30,8 @@ from app.bot.repo import BotRepo, KeyedLock, UserRow
 from app.bot.roles import RoleRegistry
 from app.config import Settings
 from app.i18n import Translator
+from app.skills.bundle import MAX_ARCHIVE_BYTES, read_bundle
+from app.skills.store import SkillStore
 
 log = logging.getLogger("app.bot")
 
@@ -33,8 +39,10 @@ GROUP_KIND = "group_member"
 DM_KINDS = ("dm_profile", "dm_skills", "dm_project", "dm_reports")
 CALLBACK_VERSION = "v1"
 TOPIC_NAME_LIMIT = 128
+ERRORS_SHOWN = 15
+MESSAGE_LIMIT = 4000
 PUBLIC_COMMANDS = ("start", "project", "help")
-OWNER_COMMANDS = ("admin", "members")
+OWNER_COMMANDS = ("admin", "members", "skill_upload")
 
 
 def context_callback(kind: str) -> str:
@@ -42,6 +50,26 @@ def context_callback(kind: str) -> str:
 
 
 MINIAPP_LATER = f"{CALLBACK_VERSION}:miniapp:later"
+SKILL_ACTIONS = ("pub", "no")
+
+
+def skill_callback(action: str, pending_id: int) -> str:
+    return f"{CALLBACK_VERSION}:skill:{action}:{pending_id}"
+
+
+def parse_skill_callback(data: str | None) -> tuple[str, int] | None:
+    parts = (data or "").split(":")
+    if (
+        len(parts) == 4
+        and parts[0] == CALLBACK_VERSION
+        and parts[1] == "skill"
+        and parts[2] in SKILL_ACTIONS
+        and parts[3].isdigit()
+    ):
+        return parts[2], int(parts[3])
+    return None
+
+
 BLUE = "primary"  # button style that Telegram draws in blue
 
 
@@ -67,6 +95,7 @@ class OnboardingService:
         roles: RoleRegistry,
         settings: Settings,
         tenant_id: str,
+        skills: SkillStore | None = None,
     ):
         self.bot = bot
         self.repo = repo
@@ -74,6 +103,8 @@ class OnboardingService:
         self.roles = roles
         self.settings = settings
         self.tenant_id = tenant_id
+        self.skills = skills
+        self._awaiting_skill: set[int] = set()  # owner ids that sent /skill_upload
         self._lock = KeyedLock()
         self._username: str | None = None
 
@@ -261,7 +292,7 @@ class OnboardingService:
     async def handle_help(self, user: User, chat_id: int) -> None:
         text = self.t("help_text")
         if self.is_owner(user.id):
-            text += "\n" + self.t("help_owner")
+            text += "\n" + self.t("help_owner") + "\n" + self.t("help_owner_skills")
         await self.bot.send_message(chat_id=chat_id, text=text)
 
     async def handle_owner_command(self, user: User, chat_id: int, command: str) -> None:
@@ -276,6 +307,132 @@ class OnboardingService:
         await self.bot.send_message(
             chat_id=chat_id, text="\n".join([self.t("members_header", total=total), *lines])
         )
+
+    # skill upload --------------------------------------------------------
+    async def handle_skill_upload(self, user: User, chat_id: int) -> None:
+        if not self.is_owner(user.id) or self.skills is None:
+            await self.bot.send_message(chat_id=chat_id, text=self.t("owner_only"))
+            return
+        self._awaiting_skill.add(user.id)
+        await self.bot.send_message(chat_id=chat_id, text=self.t("skill_upload_prompt"))
+
+    async def handle_document(
+        self, user: User, chat_id: int, document: Document, caption: str | None
+    ) -> None:
+        """An archive with a skill: checked by the repository validator, published by a button."""
+        asked = (caption or "").strip().split("@")[0].lower() == "/skill_upload"
+        if asked and not self.is_owner(user.id):
+            await self.bot.send_message(chat_id=chat_id, text=self.t("owner_only"))
+            return
+        if not self.is_owner(user.id) or self.skills is None:
+            return  # files from members are not a skill upload: nothing to say
+        if not asked and user.id not in self._awaiting_skill:
+            await self.bot.send_message(chat_id=chat_id, text=self.t("skill_upload_not_expected"))
+            return
+        limit_kb = MAX_ARCHIVE_BYTES // 1024
+        if document.file_size is not None and document.file_size > MAX_ARCHIVE_BYTES:
+            await self.bot.send_message(
+                chat_id=chat_id, text=self.t("skill_upload_too_big", limit=limit_kb)
+            )
+            return
+        await self.bot.send_message(chat_id=chat_id, text=self.t("skill_upload_busy"))
+        file = await self.bot.get_file(document.file_id)
+        if not file.file_path:
+            return
+        buffer = await self.bot.download_file(file.file_path)
+        data = buffer.read() if buffer is not None else b""
+        if len(data) > MAX_ARCHIVE_BYTES:
+            await self.bot.send_message(
+                chat_id=chat_id, text=self.t("skill_upload_too_big", limit=limit_kb)
+            )
+            return
+        bundle = read_bundle(data)
+        if bundle.error:
+            await self.bot.send_message(
+                chat_id=chat_id, text=self.t(f"skill_upload_bundle_{bundle.error}")
+            )
+            return
+        result = await asyncio.to_thread(
+            self.skills.add_pending, self.tenant_id, bundle.skill_md, bundle.test_yaml, user.id
+        )
+        slug = result.doc.slug if result.doc else ""
+        if result.errors:
+            listing = "\n".join(f"• {e}" for e in result.errors[:ERRORS_SHOWN])
+            key = "skill_upload_failed" if slug else "skill_upload_failed_unknown"
+            await self.bot.send_message(
+                chat_id=chat_id, text=self.t(key, slug=slug, errors=listing)[:MESSAGE_LIMIT]
+            )
+            return
+        if result.conflict and result.doc:
+            await self.bot.send_message(
+                chat_id=chat_id,
+                text=self.t(
+                    f"skill_upload_conflict_{result.conflict}",
+                    slug=slug,
+                    version=result.doc.version,
+                    latest=result.latest or "",
+                ),
+            )
+            return
+        self._awaiting_skill.discard(user.id)
+        doc = result.doc
+        assert doc is not None and result.pending_id is not None
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=self.t("skill_publish_button"),
+                        callback_data=skill_callback("pub", result.pending_id),
+                        style=BLUE,
+                    ),
+                    InlineKeyboardButton(
+                        text=self.t("skill_discard_button"),
+                        callback_data=skill_callback("no", result.pending_id),
+                    ),
+                ]
+            ]
+        )
+        await self.bot.send_message(
+            chat_id=chat_id,
+            text=self.t(
+                "skill_upload_checked",
+                title=doc.title,
+                slug=doc.slug,
+                version=doc.version,
+                branch=doc.branch,
+            ),
+            reply_markup=keyboard,
+        )
+
+    async def handle_skill_button(self, query: CallbackQuery) -> None:
+        """Publish or cancel. The role is checked again here: a button can be forwarded."""
+        parsed = parse_skill_callback(query.data)
+        if parsed is None or self.skills is None:
+            await query.answer(self.t("stale_button"), show_alert=True)
+            return
+        if not self.is_owner(query.from_user.id):
+            await query.answer(self.t("owner_only"), show_alert=True)
+            return
+        action, pending_id = parsed
+        if action == "no":
+            done = await asyncio.to_thread(self.skills.discard, self.tenant_id, pending_id)
+            text = self.t("skill_discarded" if done else "skill_publish_gone")
+        else:
+            outcome = await asyncio.to_thread(self.skills.publish, self.tenant_id, pending_id)
+            if outcome.ok and outcome.doc:
+                text = self.t(
+                    "skill_published", title=outcome.doc.title, version=outcome.doc.version
+                )
+            else:
+                text = self.t(
+                    "skill_publish_stale" if outcome.conflict == "stale" else "skill_publish_gone"
+                )
+        await query.answer(text, show_alert=True)
+        if isinstance(query.message, Message):
+            try:
+                await query.message.edit_reply_markup(reply_markup=None)
+            except TelegramBadRequest:
+                pass  # the message is too old to edit: the answer above is enough
 
     # menus ---------------------------------------------------------------
     async def sync_commands(self) -> None:

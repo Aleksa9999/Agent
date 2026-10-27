@@ -151,6 +151,7 @@ async def test_menus_show_owner_commands_only_in_the_owner_chat(runtime, session
         "help",
         "admin",
         "members",
+        "skill_upload",
     ]
     assert owner_menu.scope.chat_id == OWNER_ID
 
@@ -203,4 +204,4 @@ async def test_setup_survives_an_owner_who_has_not_written_to_the_bot_yet(runtim
     session.calls.clear()
     await runtime.feed("default", command_update(OWNER, "/start"))
     (owner_menu,) = session.of("setMyCommands")
-    assert [c.command for c in owner_menu.commands][-2:] == ["admin", "members"]
+    assert [c.command for c in owner_menu.commands][-3:] == ["admin", "members", "skill_upload"]
