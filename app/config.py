@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     app_env: Literal["test", "prod"] = "test"
     tenants_dir: Path = Path("config/tenants")
     locales_dir: Path = Path("locales")
+    prompts_dir: Path = Path("prompts")
+    skills_dir: Path = Path("content/skills")
     default_tenant: str = "default"
 
     database_url: str = "sqlite:///./local.db"
@@ -29,6 +31,14 @@ class Settings(BaseSettings):
     tg_webhook_secret: SecretStr | None = None
     fernet_key: SecretStr | None = None
     qwen_api_key: SecretStr | None = None
+    qwen_base_url: str = (
+        "https://dashscope-intl.aliyuncs.com/api/v2/apps/protocols/compatible-mode/v1"
+    )
+    qwen_model: str | None = None
+    qwen_fast_model: str | None = None
+    model_catalog_path: Path = Path("config/model_catalog.yaml")
+    context_budget_tokens: int = 60000
+    context_keep_last: int = 30
     dashscope_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     elevenlabs_api_key: SecretStr | None = None

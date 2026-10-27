@@ -7,6 +7,7 @@ from aiogram import Bot
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from app.agent.store import AgentStore
 from app.bot.repo import BotRepo
 from app.bot.runtime import BotRuntime
 from app.config import Settings
@@ -90,5 +91,7 @@ def runtime(settings: Settings, engine, session: FakeSession) -> BotRuntime:
         tenants=tenants,
         translator=Translator(settings.locales_dir, tenants),
         repo=BotRepo(engine),
+        store=AgentStore(engine),
         bot_factory=lambda tenant_id: bot,
+        model_factory=lambda tenant_id: None,
     )

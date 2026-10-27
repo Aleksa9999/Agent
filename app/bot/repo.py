@@ -135,6 +135,19 @@ class BotRepo:
     async def get_topic(self, tenant_id: str, user_id: int, kind: str) -> TopicRow | None:
         return await self._run(self._get_topic, tenant_id, user_id, kind)
 
+    def _kind_by_thread(self, tenant_id, user_id, thread_id):
+        with self._sessions() as s:
+            return s.scalar(
+                select(Topic.kind).where(
+                    Topic.tenant_id == tenant_id,
+                    Topic.user_id == user_id,
+                    Topic.thread_id == thread_id,
+                )
+            )
+
+    async def kind_by_thread(self, tenant_id: str, user_id: int, thread_id: int) -> str | None:
+        return await self._run(self._kind_by_thread, tenant_id, user_id, thread_id)
+
     def _add_topic(self, tenant_id, user_id, kind, chat_id, thread_id) -> bool:
         try:
             with self._sessions.begin() as s:

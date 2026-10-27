@@ -3,7 +3,7 @@
 .env.*
 !.env.example
 tests
-content
+content/methods
 _specs
 _docs
 docs

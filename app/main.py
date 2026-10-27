@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.agent.store import AgentStore
 from app.bot.repo import BotRepo
 from app.bot.roles import RoleRegistry
 from app.bot.runtime import BotRuntime
@@ -58,12 +59,14 @@ def create_app(
 
     def get_runtime() -> BotRuntime:
         if not runtimes:
+            engine = make_engine(settings)
             runtimes.append(
                 BotRuntime(
                     settings=settings,
                     tenants=tenants,
                     translator=Translator(settings.locales_dir, tenants),
-                    repo=BotRepo(make_engine(settings)),
+                    repo=BotRepo(engine),
+                    store=AgentStore(engine),
                 )
             )
         return runtimes[0]

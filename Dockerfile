@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY config ./config
 COPY locales ./locales
+COPY prompts ./prompts
+COPY content/skills ./content/skills
 COPY alembic.ini ./
 
 USER googlagent

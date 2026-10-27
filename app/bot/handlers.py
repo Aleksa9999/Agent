@@ -6,8 +6,10 @@ A Router can be attached to one Dispatcher only, so every tenant gets its own ro
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import JOIN_TRANSITION, ChatMemberUpdatedFilter, Command, CommandStart
-from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
+from aiogram.types import CallbackQuery, ChatMemberUpdated, Message, MessageGenerationStopped
 
+from app.bot import options_ui
+from app.bot.chat import AgentChat
 from app.bot.service import MINIAPP_LATER, OnboardingService, parse_context_callback
 
 
@@ -52,6 +54,19 @@ def build_router() -> Router:
             await query.answer(svc.t("project_set", name=svc.t(f"topic_{kind}")))
             return
         await query.answer(svc.t("stale_button"), show_alert=True)
+
+    @router.message(F.text, ~F.text.startswith("/"), private)
+    async def on_text(message: Message, chat: AgentChat) -> None:
+        if message.from_user:
+            await chat.handle_text(message.from_user, message)
+
+    @router.callback_query(F.data.startswith(options_ui.PREFIX + ":"))
+    async def on_question_button(query: CallbackQuery, chat: AgentChat) -> None:
+        await chat.handle_question_button(query)
+
+    @router.stopped_message_generation()
+    async def on_generation_stopped(event: MessageGenerationStopped, chat: AgentChat) -> None:
+        chat.stop(event)
 
     @router.callback_query(F.data == MINIAPP_LATER)
     async def on_miniapp_later(query: CallbackQuery, svc: OnboardingService) -> None:

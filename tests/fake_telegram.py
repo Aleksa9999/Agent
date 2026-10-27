@@ -16,6 +16,7 @@ class FakeSession(BaseSession):
         super().__init__()
         self.calls: list[tuple[str, Any]] = []
         self.private_topics_supported = True
+        self.drafts_supported = True
         self._thread = 100
         self._message = 0
 
@@ -34,6 +35,8 @@ class FakeSession(BaseSession):
         self.calls.append((name, method))
         if name == "createForumTopic" and method.chat_id > 0 and not self.private_topics_supported:
             raise TelegramBadRequest(method=method, message="Bad Request: topics are not enabled")
+        if name == "sendMessageDraft" and not self.drafts_supported:
+            raise TelegramBadRequest(method=method, message="Bad Request: drafts are not available")
         result: Any = True
         if name == "getMe":
             result = {"id": 999, "is_bot": True, "first_name": "Bot", "username": BOT_USERNAME}
@@ -117,3 +120,16 @@ def callback_update(
             "text": "offer",
         }
     return {"update_id": update_id, "callback_query": query}
+
+
+def text_update(user: dict, text: str, update_id: int = 5, thread_id: int | None = None) -> dict:
+    message = {
+        "message_id": 3,
+        "date": 0,
+        "chat": {"id": user["id"], "type": "private"},
+        "from": user,
+        "text": text,
+    }
+    if thread_id is not None:
+        message["message_thread_id"] = thread_id
+    return {"update_id": update_id, "message": message}

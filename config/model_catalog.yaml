@@ -1,0 +1,10 @@
+# Model catalog: ids, capabilities and prices come from the provider API (daily sync, later slice).
+# Until the first sync this list is empty, and the agent says "not found" instead of guessing.
+# Entry format:
+# models:
+#   - provider: modelstudio
+#     model_id: <exact id from the provider>
+#     capability: text        # text | vision | image | video | tts | asr
+#     prices: {input_per_mtok_usd: 0.0, output_per_mtok_usd: 0.0}
+#     synced_at: "2026-10-27"
+models: []

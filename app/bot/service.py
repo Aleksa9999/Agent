@@ -94,7 +94,7 @@ class OnboardingService:
         name = f"{first} {last}".strip() or (user.username or "") or self.t("member_fallback_name")
         return name[:TOPIC_NAME_LIMIT]
 
-    async def _upsert(self, user: User) -> UserRow:
+    async def upsert_user(self, user: User) -> UserRow:
         return await self.repo.upsert_user(
             self.tenant_id,
             user.id,
@@ -111,7 +111,7 @@ class OnboardingService:
         if user.is_bot or chat_id != self.settings.group_chat_id:
             return
         async with self._lock((self.tenant_id, user.id)):
-            row = await self._upsert(user)
+            row = await self.upsert_user(user)
             if await self.repo.get_topic(self.tenant_id, row.id, GROUP_KIND):
                 return  # a rejoin or a duplicate update: nothing to create
             started = time.monotonic()
@@ -194,7 +194,7 @@ class OnboardingService:
     # private chat --------------------------------------------------------
     async def handle_start(self, user: User, chat_id: int) -> None:
         async with self._lock((self.tenant_id, user.id)):
-            row = await self._upsert(user)
+            row = await self.upsert_user(user)
             await self.repo.update_user(row.id, dm_chat_id=chat_id)
             if row.dm_topics_supported is False:
                 await self._send_project_picker(chat_id, "dm_topics_unavailable")
@@ -245,7 +245,7 @@ class OnboardingService:
         )
 
     async def handle_project(self, user: User, chat_id: int) -> None:
-        await self._upsert(user)
+        await self.upsert_user(user)
         await self._send_project_picker(chat_id, "project_pick")
 
     async def set_context(self, tg_id: int, kind: str) -> bool:

@@ -19,7 +19,7 @@ case "${1:-}" in
     mkdir -p "$RUN_DIR"
     chown postgres "$RUN_DIR" 2>/dev/null || true
     if [[ ! -d "$RUN_DIR/pg" ]]; then
-      "${RUNAS[@]}" "$PG_BIN/initdb" -D "$RUN_DIR/pg" -A trust >/dev/null
+      "${RUNAS[@]}" "$PG_BIN/initdb" -D "$RUN_DIR/pg" -A trust -E UTF8 --locale=C.UTF-8 >/dev/null
     fi
     "${RUNAS[@]}" "$PG_BIN/pg_ctl" -D "$RUN_DIR/pg" -o "-p $PG_PORT -k $RUN_DIR" \
       -l "$RUN_DIR/pg.log" -w start >/dev/null

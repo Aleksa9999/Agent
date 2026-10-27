@@ -3,6 +3,7 @@
 import asyncio
 import sys
 
+from app.agent.store import AgentStore
 from app.bot.repo import BotRepo
 from app.bot.runtime import BotRuntime
 from app.config import get_settings
@@ -14,11 +15,13 @@ from app.tenants import TenantRegistry
 async def _main(tenant_id: str | None) -> None:
     settings = get_settings()
     tenants = TenantRegistry.load(settings.tenants_dir)
+    engine = make_engine(settings)
     runtime = BotRuntime(
         settings=settings,
         tenants=tenants,
         translator=Translator(settings.locales_dir, tenants),
-        repo=BotRepo(make_engine(settings)),
+        repo=BotRepo(engine),
+        store=AgentStore(engine),
     )
     if not settings.webapp_url:
         raise SystemExit("WEBAPP_URL is not set")
