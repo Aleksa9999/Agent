@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта пути Googlagent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Идея: карта метро. Вертикальная линия пути со станциями, сверху мини-карта, ниже разделы "где что лежит", продукт, задачи, навыки. */
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#0E1A2B; --muted:#576377; --line:#D3D9E3;
+  --done:#14865F; --now:#1D5FE8; --later:#7C879A; --warn:#A8610A;
+  --done-bg:#E3F4EC; --now-bg:#E5EDFF; --later-bg:#EAEDF2; --warn-bg:#FBEFD9;
+  --f-display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A111E; --surface:#111B2E; --ink:#E7ECF4; --muted:#97A3B8; --line:#243148;
+    --done:#3CCB97; --now:#6C97FF; --later:#78859B; --warn:#E3A24A;
+    --done-bg:#0F2A24; --now-bg:#14234A; --later-bg:#1A2436; --warn-bg:#2D2312;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A111E; --surface:#111B2E; --ink:#E7ECF4; --muted:#97A3B8; --line:#243148;
+  --done:#3CCB97; --now:#6C97FF; --later:#78859B; --warn:#E3A24A;
+  --done-bg:#0F2A24; --now-bg:#14234A; --later-bg:#1A2436; --warn-bg:#2D2312;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--f-body);-webkit-text-size-adjust:100%}
+a{color:var(--now)}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+h1,h2,h3{text-wrap:balance;margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding:0 18px}
+
+/* шапка */
+header.top{padding:34px 0 18px}
+.eyebrow{font:500 12px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font:700 clamp(28px,5.4vw,46px)/1.08 var(--f-display);margin:10px 0 12px;letter-spacing:-.02em}
+.lead{max-width:62ch;color:var(--muted);font-size:17px;margin:0}
+.lead b{color:var(--ink);font-weight:600}
+.counters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:22px 0 0}
+.counter{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.counter .n{font:700 26px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.counter .l{font-size:13px;color:var(--muted);margin-top:6px}
+
+/* навигация */
+nav.sticky{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav.sticky .wrap{display:flex;gap:6px;overflow-x:auto;padding-top:10px;padding-bottom:10px;scrollbar-width:thin}
+nav.sticky a{white-space:nowrap;text-decoration:none;color:var(--ink);font-size:14px;font-weight:500;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+nav.sticky a:hover{border-color:var(--now);color:var(--now)}
+nav.sticky a:focus-visible,summary:focus-visible,button:focus-visible{outline:3px solid var(--now);outline-offset:2px}
+
+section.block{padding:44px 0 6px}
+.block>.wrap>h2{font:700 clamp(22px,3.6vw,30px)/1.15 var(--f-display);letter-spacing:-.015em}
+.block>.wrap>.sub{color:var(--muted);max-width:66ch;margin:10px 0 22px}
+
+/* легенда */
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 16px;font-size:14px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:3px solid var(--later);background:var(--surface)}
+.dot.done{border-color:var(--done);background:var(--done)}
+.dot.now{border-color:var(--now);background:var(--surface)}
+.dot.later{border-color:var(--later)}
+
+/* мини-карта */
+.mini{display:grid;grid-template-columns:repeat(11,1fr);gap:4px;margin:6px 0 26px}
+.mini button{all:unset;cursor:pointer;display:block;text-align:center;padding:8px 0 6px;border-radius:8px}
+.mini button:hover{background:var(--surface)}
+.mini .bar{display:block;height:8px;border-radius:99px;background:var(--later-bg);position:relative;overflow:hidden}
+.mini .bar i{position:absolute;inset:0;background:var(--later)}
+.mini .done i{background:var(--done)}
+.mini .now i{background:var(--now)}
+.mini .n{display:block;font:500 12px/1 var(--f-mono);margin-top:7px;color:var(--muted)}
+.mini .here{display:block;font:600 10px/1 var(--f-mono);color:var(--now);margin-top:4px;min-height:10px}
+@media (max-width:560px){.mini .n{font-size:10px}}
+
+/* путь */
+ol.route{list-style:none;margin:0;padding:0;position:relative}
+ol.route::before{content:"";position:absolute;left:19px;top:14px;bottom:14px;width:4px;background:linear-gradient(var(--done) 0 62%,var(--now) 62% 66%,var(--later) 66% 100%);border-radius:4px;opacity:.55}
+.stop{position:relative;padding:0 0 12px 56px}
+.stop .node{position:absolute;left:10px;top:13px;width:22px;height:22px;border-radius:50%;border:5px solid var(--later);background:var(--bg);z-index:1}
+.stop.done .node{border-color:var(--done);background:var(--done)}
+.stop.now .node{border-color:var(--now);background:var(--bg);box-shadow:0 0 0 6px var(--now-bg)}
+@media (prefers-reduced-motion:no-preference){.stop.now .node{animation:pulse 2.2s ease-in-out infinite}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 4px var(--now-bg)}50%{box-shadow:0 0 0 10px transparent}}
+details.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.stop.now details.card{border-color:var(--now)}
+details.card>summary{list-style:none;cursor:pointer;padding:13px 16px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:start}
+details.card>summary::-webkit-details-marker{display:none}
+.stop .num{font:500 12px/1 var(--f-mono);color:var(--muted);letter-spacing:.04em}
+.stop h3{font:600 17px/1.25 var(--f-body)}
+.stop .one{grid-column:1/-1;color:var(--muted);font-size:15px;margin-top:2px}
+.pill{font:600 12px/1 var(--f-body);padding:5px 9px;border-radius:99px;white-space:nowrap;align-self:start}
+.pill.done{background:var(--done-bg);color:var(--done)}
+.pill.now{background:var(--now-bg);color:var(--now)}
+.pill.later{background:var(--later-bg);color:var(--muted)}
+.chev{display:inline-block;margin-left:6px;transition:transform .2s}
+details[open]>summary .chev{transform:rotate(90deg)}
+.body{padding:2px 16px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 22px;border-top:1px dashed var(--line);margin-top:2px;padding-top:14px}
+.body h4{margin:0 0 4px;font:600 12px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.body p,.body ul{margin:0;font-size:15px}
+.body ul{padding-left:18px}
+.body li{margin:3px 0}
+.path{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font:400 13px/1.6 var(--f-mono);word-break:break-all}
+.hereflag{display:inline-block;background:var(--now);color:#fff;font:600 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 8px;border-radius:5px;margin-left:8px;vertical-align:2px}
+
+/* карта мест */
+.places{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.place{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;position:relative}
+.place h3{font:600 16px/1.25 var(--f-body);margin:6px 0 6px}
+.place p{margin:0;font-size:14.5px;color:var(--muted)}
+.place .tag{font:500 11px/1 var(--f-mono);letter-spacing:.05em;text-transform:uppercase;padding:4px 7px;border-radius:5px;display:inline-block}
+.tag.done{background:var(--done-bg);color:var(--done)}
+.tag.later{background:var(--later-bg);color:var(--muted)}
+.tag.now{background:var(--now-bg);color:var(--now)}
+.flow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:16px 0 0;font-size:14px;color:var(--muted)}
+.flow b{color:var(--ink);font-weight:600}
+
+/* дерево файлов */
+.tree{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 8px;font-family:var(--f-mono);font-size:13.5px;overflow-x:auto}
+.tree details{margin-left:14px}
+.tree>details{margin-left:0}
+.tree summary{cursor:pointer;padding:4px 8px;border-radius:6px;list-style:none;white-space:nowrap}
+.tree summary::-webkit-details-marker{display:none}
+.tree summary::before{content:"▸";display:inline-block;width:1.1em;color:var(--muted);transition:transform .15s}
+.tree details[open]>summary::before{transform:rotate(90deg)}
+.tree summary:hover{background:var(--bg)}
+.tree .f{display:flex;gap:10px;padding:3px 8px 3px 26px;white-space:nowrap}
+.tree .d{font-family:var(--f-body);color:var(--muted);font-size:13.5px}
+.tree .name{color:var(--ink)}
+.tree .plan .name{color:var(--later);text-decoration:underline dashed;text-underline-offset:3px}
+.tree .badge{font:500 10px/1 var(--f-mono);text-transform:uppercase;letter-spacing:.05em;padding:3px 6px;border-radius:4px;background:var(--later-bg);color:var(--muted);margin-left:8px}
+.treenote{color:var(--muted);font-size:14px;margin:10px 2px 0}
+
+/* продукт */
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;padding:0;margin:0;list-style:none}
+.steps li{counter-increment:s;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px 14px 54px;position:relative;font-size:15px}
+.steps li::before{content:counter(s);position:absolute;left:14px;top:13px;width:28px;height:28px;border-radius:50%;background:var(--now-bg);color:var(--now);font:600 14px/28px var(--f-mono);text-align:center}
+.steps b{display:block;font-weight:600;margin-bottom:2px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.panel h3{font:600 17px/1.25 var(--f-body);margin-bottom:8px}
+.panel p,.panel li{font-size:15px;margin:0 0 6px}
+.panel ul{padding-left:18px;margin:0}
+.check{list-style:none;padding:0!important}
+.check li{padding-left:26px;position:relative}
+.check li::before{content:"";position:absolute;left:3px;top:6px;width:11px;height:6px;border-left:3px solid var(--done);border-bottom:3px solid var(--done);transform:rotate(-45deg)}
+
+/* волны */
+.waves{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.wave{background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--later);border-radius:12px;padding:16px}
+.wave.now{border-top-color:var(--now)}
+.wave h3{font:600 17px/1.25 var(--f-body);margin:8px 0 8px}
+.wave ul{margin:0;padding-left:18px;font-size:15px}
+.wave li{margin:3px 0}
+
+/* таски */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.toolbar button,.chip{font:500 14px/1 var(--f-body);padding:8px 13px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.toolbar button[aria-pressed="true"]{background:var(--now);border-color:var(--now);color:#fff}
+.tasks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.task{all:unset;box-sizing:border-box;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:block}
+.task:focus-visible{outline:3px solid var(--now);outline-offset:2px}
+.task .tn{font:600 12px/1 var(--f-mono);color:var(--muted)}
+.task .tt{display:block;font-weight:600;font-size:15px;margin:6px 0}
+.task .tm{display:block;font-size:13px;color:var(--muted)}
+.task .go{display:inline-block;font:600 11px/1 var(--f-body);background:var(--done-bg);color:var(--done);padding:4px 7px;border-radius:99px;margin-bottom:6px}
+.task.sel{border-color:var(--now);box-shadow:0 0 0 3px var(--now-bg)}
+.task.dep{border-color:var(--warn);background:var(--warn-bg)}
+.task.after{border-color:var(--done);background:var(--done-bg)}
+.task.hide{display:none}
+.taskinfo{margin:14px 0 0;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-size:15px;min-height:60px}
+.taskinfo b{font-weight:600}
+
+/* навыки */
+.branches{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.branch{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.branch h3{font:600 15px/1.2 var(--f-body);margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
+.branch h3 span{font:500 12px/1 var(--f-mono);color:var(--muted);align-self:center}
+.sk{display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px dashed var(--line);font-size:14px}
+.sk:first-of-type{border-top:0}
+.sk .k{font:500 10px/1 var(--f-mono);text-transform:uppercase;letter-spacing:.04em;padding:3px 5px;border-radius:4px;background:var(--later-bg);color:var(--muted);flex:none}
+.sk .k.build{background:var(--now-bg);color:var(--now)}
+.sk .k.deliver{background:var(--done-bg);color:var(--done)}
+.sk.hide{display:none}
+.sk .nm{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:block}
+.empty{color:var(--muted);font-size:14px;font-style:italic}
+
+/* кто делает */
+.who{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.who ul{margin:0;padding-left:18px;font-size:15px}
+.who li{margin:4px 0}
+
+/* словарь */
+dl.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 22px;margin:0}
+dl.gl div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+dl.gl dt{font-weight:600;margin-bottom:2px}
+dl.gl dd{margin:0;color:var(--muted);font-size:14.5px}
+
+footer{padding:40px 0 60px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">SuperAi Studio · дорожная карта · 27 октября 2026</div>
+    <h1>Googlagent: путь от идеи до бота в Telegram</h1>
+    <p class="lead">Мы строим личного ИИ-агента внутри Telegram. Человек рассказывает о себе голосом, получает первый результат за 5 минут, а дальше проходит готовые навыки на своей задаче. <b>Сейчас готов план, а код ещё не написан.</b> Ниже карта: что сделано, где всё лежит и что дальше.</p>
+    <div class="counters" aria-label="Сводка">
+      <div class="counter"><div class="n">7 из 11</div><div class="l">станций пути пройдено</div></div>
+      <div class="counter"><div class="n">26</div><div class="l">навыков в библиотеке</div></div>
+      <div class="counter"><div class="n">23</div><div class="l">критерия приёмки волны 1</div></div>
+      <div class="counter"><div class="n">17</div><div class="l">задач на первую волну</div></div>
+      <div class="counter"><div class="n">0</div><div class="l">строк кода бота (пока)</div></div>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky" aria-label="Разделы">
+  <div class="wrap">
+    <a href="#route">Карта пути</a>
+    <a href="#places">Где что живёт</a>
+    <a href="#files">Папки репозитория</a>
+    <a href="#product">Как это работает</a>
+    <a href="#waves">Три волны</a>
+    <a href="#tasks">Задачи</a>
+    <a href="#skills">Навыки</a>
+    <a href="#who">Кто что делает</a>
+    <a href="#glossary">Словарь</a>
+  </div>
+</nav>
+
+<main>
+<section class="block" id="route">
+  <div class="wrap">
+    <h2>Карта пути</h2>
+    <p class="sub">Одиннадцать станций от первых документов до боевого бота. Нажмите на станцию, чтобы увидеть, что на ней сделано, где это лежит и что получилось.</p>
+    <div class="legend">
+      <span><i class="dot done"></i>пройдено</span>
+      <span><i class="dot now"></i>следующий шаг</span>
+      <span><i class="dot later"></i>впереди</span>
+    </div>
+    <div class="mini" id="mini" role="list" aria-label="Мини-карта"></div>
+    <ol class="route" id="routeList"></ol>
+  </div>
+</section>
+
+<section class="block" id="places">
+  <div class="wrap">
+    <h2>Где что живёт</h2>
+    <p class="sub">У продукта пять мест. Люди видят только Telegram, остальное работает за кадром.</p>
+    <div class="places">
+      <div class="place"><span class="tag done">есть</span><h3>Telegram</h3><p>Тестовый бот, тестовая группа с темами, домен для Mini App. Здесь человек разговаривает с агентом и нажимает кнопки.</p></div>
+      <div class="place"><span class="tag done">есть</span><h3>GitHub</h3><p>Репозиторий <span class="path">Aleksa9999/Agent</span>. Решения, спека, задачи и библиотека навыков. Код бота появится здесь же.</p></div>
+      <div class="place"><span class="tag later">впереди</span><h3>Сервер Timeweb</h3><p>Туда выкладывается готовый бот. Выкладку делает Арсен после проверки на тесте. Старый бот V1 остаётся для отката.</p></div>
+      <div class="place"><span class="tag later">впереди</span><h3>Model Studio</h3><p>Облачные модели Alibaba: «мозги» агента, распознавание голоса, позже картинки и видео. Нужен ключ от Арсена.</p></div>
+      <div class="place"><span class="tag done">у Арсена</span><h3>Исходные материалы</h3><p>ТЗ, концепция 1000aiskill, слайды и промпты уроков 01 и 02. На них всё стоит, в репозиторий они не лежат.</p></div>
+    </div>
+    <div class="flow" aria-label="Путь запроса">
+      <b>Человек</b> → Telegram и Mini App → <b>бот на сервере</b> → <b>модель</b> в Model Studio → ответ человеку.
+      Решения и навыки подгружаются из <b>репозитория</b>.
+    </div>
+  </div>
+</section>
+
+<section class="block" id="files">
+  <div class="wrap">
+    <h2>Папки репозитория</h2>
+    <p class="sub">Так выглядит Aleksa9999/Agent прямо сейчас: 115 файлов, 3 коммита. Нажимайте на папки. Пунктиром отмечено то, что появится вместе с кодом.</p>
+    <div class="tree" id="tree" role="tree"></div>
+    <p class="treenote">Репозиторий публичный по решению Арсена: секреты, токены и данные участников туда не кладутся.</p>
+    <p class="treenote"><a href="https://github.com/Aleksa9999/Agent" rel="noopener">Открыть репозиторий на GitHub</a></p>
+  </div>
+</section>
+
+<section class="block" id="product">
+  <div class="wrap">
+    <h2>Как это работает для человека</h2>
+    <p class="sub">Курсов и домашних заданий больше нет. Вместо них навыки: человек проходит их на своей задаче, и агент становится сильнее.</p>
+    <ol class="steps">
+      <li><b>Вход</b>Человек вступает в группу. Бот создаёт его тему и присылает кнопку «Начать с моим агентом».</li>
+      <li><b>Тест голосом</b>В Mini App кнопка «Расскажи о себе». Если запись не работает, можно отправить голосовое в чат.</li>
+      <li><b>Карточка и паспорт</b>Агент показывает профиль из 6–8 строк. После «Верно» создаётся паспорт агента, версия 1.</li>
+      <li><b>Первый результат за 5 минут</b>Бизнесу таблица рутин в часах и деньгах. Остальным карточка идеи или план.</li>
+      <li><b>Три навыка</b>В дереве появляются три навыка под задачу человека со статусом «не проверен».</li>
+      <li><b>Прохождение навыка</b>Агент ведёт допрос, показывает смету, пишет спеку, задачи и пакет промптов.</li>
+      <li><b>Кнопка «Сработало»</b>Человек приносит результат на реальной задаче и подтверждает. Навык попадает в счётчик.</li>
+      <li><b>Рост</b>Копятся навыки, растёт уровень агента, открываются новые возможности.</li>
+    </ol>
+    <div class="two">
+      <div class="panel">
+        <h3>Две дороги к навыку</h3>
+        <ul>
+          <li><b>Делает агент.</b> Платформа проходит все шаги, человек выбирает на развилках и принимает результат.</li>
+          <li><b>Пройду сам.</b> Агент отдаёт пакет промптов и правил, человек работает у себя и приносит результат.</li>
+        </ul>
+        <p style="margin-top:8px;color:var(--muted)">В первой волне для навыков с кодом платформа доводит только концепцию. Код пишется в волнах 2 и 3.</p>
+      </div>
+      <div class="panel">
+        <h3>Когда навык попадает в счётчик</h3>
+        <ul class="check">
+          <li>Автотест навыка пройден.</li>
+          <li>Человек принёс результат на реальной задаче.</li>
+          <li>Человек нажал «Сработало».</li>
+        </ul>
+        <p style="margin-top:8px;color:var(--muted)">Без любого пункта навык остаётся «не проверен». Так цифра в счётчике честная.</p>
+      </div>
+      <div class="panel">
+        <h3>Сколько стоит работа агента</h3>
+        <ul>
+          <li>Free: около 10 ходов в день, первая сессия без лимита.</li>
+          <li>Грант участнику $40 в месяц, наценка на API ×1,3.</li>
+          <li>Дорогие запуски от 50 кредитов подтверждает человек, от 1000 кредитов Арсен.</li>
+          <li>Оплата Stars и тарифы появятся в волне 2.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="waves">
+  <div class="wrap">
+    <h2>Три волны</h2>
+    <p class="sub">Решение Арсена: сначала всё, что делается до написания кода, потом производство кода двумя волнами.</p>
+    <div class="waves">
+      <div class="wave now">
+        <span class="pill now">спека и задачи готовы</span>
+        <h3>Волна 1. Концепция</h3>
+        <ul>
+          <li>Бот, группа, темы, роли и команды владельца.</li>
+          <li>Mini App с голосовым тестом, карточкой профиля и паспортом.</li>
+          <li>Три первых навыка, экран «Мой Googlagent», каталог навыков.</li>
+          <li>Запуск навыка до спеки, задач, сметы и пакета промптов.</li>
+          <li>Навыки-услуги выпускают готовые документы целиком.</li>
+          <li>Кнопка «Сработало», журнал решений, отчёты, лимиты, учёт расхода.</li>
+        </ul>
+      </div>
+      <div class="wave">
+        <span class="pill later">впереди</span>
+        <h3>Волна 2. Производство, часть 1</h3>
+        <ul>
+          <li>Песочница и сборка кода, лендинги и файлы.</li>
+          <li>Картинки, видео и озвучка.</li>
+          <li>Дорога «делает агент» для сайта и приложения.</li>
+          <li>Оплата Telegram Stars, кошелёк и тарифы.</li>
+          <li>Дайджест новостей, квесты, фокус-группы.</li>
+        </ul>
+      </div>
+      <div class="wave">
+        <span class="pill later">впереди</span>
+        <h3>Волна 3. Производство, часть 2</h3>
+        <ul>
+          <li>Автоматизации по расписанию.</li>
+          <li>Виртуальные сотрудники в работе.</li>
+          <li>Отдельные боты клиентов и выкуп паспорта.</li>
+          <li>Сторонние провайдеры, Google Drive и Notion.</li>
+          <li>Маркет навыков, партнёрка, потоки по 10–20 человек.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="tasks">
+  <div class="wrap">
+    <h2>Задачи первой волны</h2>
+    <p class="sub">Семнадцать срезов. Каждый можно показать отдельно. Нажмите на карточку: жёлтым подсветятся задачи, без которых её не начать, зелёным те, которые она откроет.</p>
+    <div class="toolbar" role="group" aria-label="Фильтр задач">
+      <button type="button" data-f="all" aria-pressed="true">Все 17</button>
+      <button type="button" data-f="ready" aria-pressed="false">Можно брать сразу</button>
+    </div>
+    <div class="tasks" id="taskGrid"></div>
+    <div class="taskinfo" id="taskInfo" aria-live="polite">Выберите задачу, чтобы увидеть, что в ней строится.</div>
+  </div>
+</section>
+
+<section class="block" id="skills">
+  <div class="wrap">
+    <h2>Библиотека навыков</h2>
+    <p class="sub">26 навыков в десяти ветках дерева. Ветки «Дизайн» и «Видео и голос» пока пустые: для них нужна волна 2.</p>
+    <div class="toolbar" role="group" aria-label="Фильтр навыков" id="skillFilter">
+      <button type="button" data-f="all" aria-pressed="true">Все</button>
+      <button type="button" data-f="mine" aria-pressed="false">Восемь новых направлений</button>
+      <button type="button" data-f="lesson" aria-pressed="false">Из уроков 01 и 02</button>
+    </div>
+    <div class="branches" id="branchGrid"></div>
+    <p class="treenote">Метки: <span class="sk" style="display:inline-flex;border:0;padding:0"><span class="k build">build</span></span> собирает продукт, <span class="sk" style="display:inline-flex;border:0;padding:0"><span class="k deliver">deliver</span></span> выпускает документы и материалы, <span class="sk" style="display:inline-flex;border:0;padding:0"><span class="k">method</span></span> проводит методику. Каждый навык хранится в двух файлах: <span class="path">SKILL.md</span> и <span class="path">test.yaml</span>.</p>
+  </div>
+</section>
+
+<section class="block" id="who">
+  <div class="wrap">
+    <h2>Кто что делает и что ждёт ответа</h2>
+    <div class="who">
+      <div class="panel">
+        <h3>Claude</h3>
+        <ul>
+          <li>Пишет документы, спеки, задачи и навыки.</li>
+          <li>Пишет код волны 1 по задачам и проверяет его на заглушках.</li>
+          <li>Проверяет работу по трём осям: стандарты, спека, безопасность.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Арсен</h3>
+        <ul>
+          <li>Даёт ключи и выкладывает бот на сервер Timeweb.</li>
+          <li>Проходит путь ученика на тестовом боте и даёт команду на боевой.</li>
+          <li>Решает цены, одобряет дорогие запуски и выборочно проверяет навыки по пятницам.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Пока без ответа</h3>
+        <ul>
+          <li>Цены тарифов, подписки и выкупа паспорта.</li>
+          <li>Работает ли запись голоса из Mini App на ваших телефонах.</li>
+          <li>Точное название модели и её доступность в Model Studio.</li>
+          <li>Навыки для веток «Дизайн» и «Видео и голос».</li>
+          <li>Формат лайва по средам в 20:20 после перехода на навыки.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="glossary">
+  <div class="wrap">
+    <h2>Словарь</h2>
+    <dl class="gl">
+      <div><dt>Googlagent</dt><dd>Личный ИИ-агент одного человека. Помнит его, ведёт к цели и сам делает работу.</dd></div>
+      <div><dt>Паспорт агента</dt><dd>Профиль, цели, правила и навыки агента. Хранится версиями, его можно выкупить.</dd></div>
+      <div><dt>Навык</dt><dd>Рабочая инструкция с проверкой: когда включать, как делать, что получится, как проверить.</dd></div>
+      <div><dt>Дерево навыков</dt><dd>Десять веток: стратегия, исследования, продажи, продукт, код, дизайн, контент, видео и голос, автоматизация, личная эффективность.</dd></div>
+      <div><dt>Коробка ИИ</dt><dd>Набор моделей и сервисов под задачу в трёх вариантах: эконом, стандарт, премиум, с ценой каждого.</dd></div>
+      <div><dt>Конвейер dev-skills</dt><dd>Допрос, спека, задачи, реализация, ревью. Семь готовых скиллов, по которым ведётся вся работа.</dd></div>
+      <div><dt>Спека</dt><dd>Письменный договор о том, что делаем и как поймём, что готово. Лежит в <span class="path">_specs/</span>.</dd></div>
+      <div><dt>Критерий К1…Кn</dt><dd>Проверяемое условие готовности, например «запрос с поддельной подписью отклоняется».</dd></div>
+      <div><dt>Срез (задача)</dt><dd>Законченный кусок работы, который можно показать отдельно: от экрана до базы данных.</dd></div>
+      <div><dt>Mini App</dt><dd>Веб-приложение внутри Telegram: тест, карточка профиля, дерево навыков.</dd></div>
+      <div><dt>Тенант</dt><dd>Отдельный бренд на той же платформе. Нужен, чтобы позже запускать партнёров под их названием.</dd></div>
+      <div><dt>Ворота</dt><dd>Точка, где работа ждёт одобрения Арсена, например перед выкладкой в боевой бот.</dd></div>
+    </dl>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">Составлено 27 октября 2026. Данные взяты из репозитория: решения, спека волны 1, задачи и библиотека навыков.</div>
+</footer>
+
+<script>
+var STOPS = [
+ {n:"01",s:"done",t:"Постановка",one:"ТЗ на бота, концепция 1000aiskill, уроки 01–02, пакет dev-skills.",
+  did:["Арсен подготовил ТЗ от 25 октября и концепцию от 26 октября.","Собраны материалы курса: слайды и промпты двух уроков.","Передан пакет из семи скиллов разработки."],
+  where:["Файлы у Арсена. В репозиторий не загружены."],res:["Понятно, что строим: личного агента, который копит навыки."]},
+ {n:"02",s:"done",t:"Вопросы и решения",one:"22 решения Арсена и главный поворот: уроки заменены навыками.",
+  did:["Два раунда вопросов с выбором ответа.","Решено: стек, репозиторий, голосовой вход, лимиты, цифры, расписание лайва.","Решено: курса нет, вместо него навыки с проверкой."],
+  where:["<span class='path'>_docs/decisions.md</span>"],res:["Единый журнал решений. Если ТЗ с ним спорит, верен журнал."]},
+ {n:"03",s:"done",t:"Рабочий инструмент",one:"Конвейер из семи скиллов: допрос, спека, задачи, реализация, ревью.",
+  did:["Скиллы пакета установлены и прочитаны целиком.","Правила конвейера записаны в <span class='path'>CLAUDE.md</span> проекта."],
+  where:["<span class='path'>content/methods/dev-skills/</span>","<span class='path'>CLAUDE.md</span>"],res:["Вся дальнейшая работа идёт по одному процессу."]},
+ {n:"04",s:"done",t:"Библиотека навыков",one:"26 готовых навыков с критериями, границами и автотестами.",
+  did:["Восемь новых направлений: сайт, приложение, автоматизация, сотрудники, агентство, курсы, репетитор ОГЭ и ЕГЭ, консалтинг.","Промпты уроков 01 и 02 превращены в 17 навыков.","Добавлен навык «Разбор рутины в часах и деньгах» для владельцев бизнеса.","Написан валидатор: он проверяет структуру каждого навыка."],
+  where:["<span class='path'>content/skills/</span>","<span class='path'>tools/validate_skills.py</span>"],res:["Все 26 навыков проходят проверку структуры. Тестовые сценарии на модели ещё не запускались."]},
+ {n:"05",s:"done",t:"Репозиторий",one:"Всё выложено на GitHub, 3 коммита, 115 файлов.",
+  did:["Репозиторий создал Арсен, Claude подключён к нему.","Загружены документы, навыки, спека и задачи."],
+  where:["<a href='https://github.com/Aleksa9999/Agent' rel='noopener'>github.com/Aleksa9999/Agent</a>"],res:["Единое место, откуда пойдёт код. Репозиторий публичный."]},
+ {n:"06",s:"done",t:"Спека волны 1",one:"23 критерия приёмки и 33 истории пользователей.",
+  did:["Описано, что человек увидит в конце первой волны.","Записаны проверяемые критерии К1–К23.","Решено, что в волну не входит: оплата Stars, код проектов, медиа."],
+  where:["<span class='path'>_specs/wave-1-concept/spec.md</span>"],res:["Письменный договор о том, что значит «первая волна готова»."]},
+ {n:"07",s:"done",t:"Задачи",one:"17 срезов, все 23 критерия закрыты, брать сразу можно 01 и 04.",
+  did:["Спека нарезана на срезы с зависимостями.","Проверено, что ни один критерий не потерян."],
+  where:["<span class='path'>_specs/wave-1-concept/tasks/</span>"],res:["Готовый план работ. Ждёт команды на начало разработки."]},
+ {n:"08",s:"now",t:"Код волны 1",one:"Дальше: реализация срезов по порядку, начиная с каркаса и оркестратора агента.",here:true,
+  did:["Пока ничего не написано: это следующий шаг."],
+  where:["Код появится в этом же репозитории: <span class='path'>app/</span> (бот и агент), <span class='path'>miniapp/</span> (Mini App), <span class='path'>deploy/</span> (запуск на сервере)."],
+  res:["Работающий бот на заглушках модели, проверенный тестами и ревью. Модель подключается, когда Арсен даст ключ."]},
+ {n:"09",s:"later",t:"Проверка на тестовом боте",one:"Арсен проходит путь ученика и даёт команду на боевой бот. Это первые ворота.",
+  did:["Выкладка на сервер делается на стороне Арсена по инструкции из репозитория.","Путь на проверке: вход, голосовой тест, карточка, первый результат, навык, «Сработало»."],
+  where:["Тестовый бот и тестовая группа в Telegram."],res:["Разрешение на выкладку. Откат на старого бота занимает меньше двух минут."]},
+ {n:"10",s:"later",t:"Волна 2",one:"Производство: код проектов, картинки и видео, оплата Stars, «делает агент».",
+  did:["Появляется песочница и сборка сайтов и приложений.","Подключаются платежи и тарифы."],where:["Тот же репозиторий, новые спеки в <span class='path'>_specs/</span>."],res:["Агент не только ведёт, но и делает."]},
+ {n:"11",s:"later",t:"Волна 3",one:"Автоматизации, виртуальные сотрудники, боты клиентов, выкуп паспорта, маркет навыков.",
+  did:["Агент работает по расписанию и на клиентов клиента.","Запускаются потоки по 10–20 человек."],where:["Тот же репозиторий."],res:["Платформа, где навыки можно покупать и продавать."]}
+];
+var TREE = [
+ {d:"_docs",c:"решения и описание продукта",ch:[
+   {f:"decisions.md",d:"журнал решений Арсена, главный документ"},
+   {f:"project.md",d:"зачем продукт, для кого, роли"},
+   {f:"skills-model.md",d:"навыки, уровни, зачёт в счётчик"},
+   {f:"placement-test.md",d:"тест на входе и подбор трёх навыков"},
+   {f:"stack.md",d:"технологии проекта"},
+   {f:"changes-vs-tz.md",d:"что изменилось в задачах из ТЗ"}]},
+ {d:"_specs",c:"спеки и задачи",ch:[{d:"wave-1-concept",c:"первая волна",ch:[
+   {f:"spec.md",d:"спека: 23 критерия"},{d:"tasks",c:"17 задач",ch:[{f:"01 … 17",d:"по одной задаче в файле"}]}]}]},
+ {d:"content",c:"то, что подгружает агент",ch:[
+   {d:"skills",c:"26 навыков в 8 ветках",ch:[
+     {f:"_FORMAT.md",d:"как устроен навык"},{f:"_PIPELINE.md",d:"общий конвейер навыков"},{f:"INDEX.md",d:"список всех навыков"},
+     {f:"code/ strategy/ research/ sales/ product/ content/ automation/ personal/",d:"в каждой по навыку: SKILL.md и test.yaml"}]},
+   {d:"methods",c:"методики",ch:[{d:"dev-skills",c:"7 скиллов конвейера",ch:[{f:"grill-me, to-spec, to-tasks, implement, code-review, security-review, handoff",d:"не правятся"}]}]}]},
+ {d:"tools",c:"скрипты",ch:[
+   {f:"validate_skills.py",d:"проверка структуры навыков"},{f:"build_index.py",d:"сборка списка навыков"},{f:"migrate_lessons.py",d:"перенос уроков в навыки"}]},
+ {f:"CLAUDE.md",d:"правила проекта и карта документов"},
+ {d:"app",plan:true,c:"бот, агент, база, расписания",ch:[]},
+ {d:"miniapp",plan:true,c:"Mini App в Telegram",ch:[]},
+ {d:"deploy",plan:true,c:"запуск, бэкап, откат",ch:[]},
+ {d:"tests",plan:true,c:"проверки кода",ch:[]}
+];
+var DATA = {"tasks": [{"id": "01", "title": "Каркас, test-стенд и безопасность", "deps": [], "ks": ["К23"], "what": "Разработчик одной командой поднимает test-стек: сервисы бота, API Mini App, воркеры, база и очередь работают, `/health` отвечает «ок». В репозитории есть конфигурация по средам, шаблон `.env.example`, проверка секретов в CI и pre-commit, скрипты бэкапа и отката, описание выкладки для владельца. Все таблицы с первого дня содержат `tenant_id`, все тексты лежат в файлах переводов, бренд и токен бота берутся из настроек арендатора."}, {"id": "02", "title": "Роли, группа, темы и команды владельца", "deps": ["01"], "ks": ["К1", "К18"], "what": "Новый участник тестовой группы получает тему со своим именем и кнопку «Начать с моим агентом». По кнопке открывается личка с темами «Профиль», «Навыки», «Проект», «Отчёты»; если клиент не поддерживает темы, работает `/project`. Роли определяются по Telegram-ID из серверного реестра. Команды владельца видны и доступны только ему. Повторные нажатия и старые кнопки не создают дублей."}, {"id": "03", "title": "Mini App: безопасный вход и синяя кнопка", "deps": ["01", "02"], "ks": ["К2", "К3"], "what": "Mini App открывается из бота и принимает только запросы с проверенной подписью и сроком жизни. Кнопка входа в Mini App всегда на виду и выделена синим. Когда агенту нужен Mini App, он присылает сообщение «Откроем Mini App?» с кнопками «Открыть» и «Не сейчас». Способ выделения кнопки цветом и поведение «Открыть» проверяются по актуальному Bot API; если выделение цветом недоступно, используется синий значок и подпись."}, {"id": "04", "title": "Оркестратор агента: наставник, исследование, расчёты", "deps": ["01"], "ks": ["К15"], "what": "Агент отвечает в режиме наставника, сам вызывает исследование с веб-поиском и расчёты в песочнице как отдельные запросы к модели и получает результат как ответ инструмента. Вопросы и развилки задаются кнопками стандарта А (4 варианта, «Свой ответ», «Не знаю», «Назад», «Сравнить», рекомендуемый помечен). Контекст собирается слоями в заданном порядке с бюджетом и сжатием истории. Первый токен длинного ответа приходит быстро, потоком с кнопкой остановки."}, {"id": "05", "title": "Библиотека навыков, каталог и /skill_upload", "deps": ["01", "02"], "ks": ["К10", "К20"], "what": "Платформа загружает навыки из репозитория, проверяет их валидатором формата и показывает каталог: 8 направлений карточками и ветки дерева из 10 направлений. У каждого навыка видны дорога, смета и условие открытия. Владелец загружает новый навык командой, получает результат проверки и публикует его кнопкой «Опубликовать»."}, {"id": "06", "title": "Тест на входе: голос, запасной путь, анкета", "deps": ["03", "04"], "ks": ["К4", "К5", "К6"], "what": "В Mini App человек нажимает «Расскажи о себе» и наговаривает рассказ. Голос распознаётся, агент заполняет поля профиля и доспрашивает пробелы пачками. Если запись недоступна, голосовое в чате заполняет ту же анкету. Для тех, кто не хочет говорить, есть анкета блоками по 5 вопросов, каждый следующий блок подстраивается под предыдущие ответы; прерванная продолжается с того же вопроса."}, {"id": "07", "title": "Карточка профиля и паспорт агента v1", "deps": ["06"], "ks": ["К7"], "what": "Агент показывает карточку профиля из 6–8 строк и кнопки «Верно» и «Поправить». После подтверждения создаётся паспорт агента v1, паспорт версионируется. В теме человека в группе публикуется публичная часть профиля без денег, контактов и возраста."}, {"id": "08", "title": "Трек, три навыка, «Мой Googlagent» и первый результат", "deps": ["04", "05", "07"], "ks": ["К8", "К9"], "what": "Агент определяет трек по профилю и выбирает три навыка по таблице из документа теста на входе. За 5 минут работы он отдаёт первый результат: таблицу рутин в часах и деньгах для бизнеса, карточку идеи или план для остальных. Экран «Мой Googlagent» показывает уровень 1, 10 веток и эти три навыка со статусом «не проверен»."}, {"id": "09", "title": "Запуск навыка: допрос и спека", "deps": ["04", "05"], "ks": ["К11"], "what": "Человек выбирает навык, агент объясняет дорогу и показывает смету трёх уровней. Затем ведёт допрос по правилам навыка (пачки не больше пяти, у каждого рекомендация, «решай сам» принимается как ответ) и записывает спеку с критериями приёмки, согласованную с человеком до записи."}, {"id": "10", "title": "Запуск навыка: таски, смета и пакет промптов", "deps": ["09"], "ks": ["К11"], "what": "Агент режет спеку на вертикальные срезы с блокировками и картой покрытия критериев, показывает смету коробки по трём уровням с ценами из каталога моделей и отдаёт пакет промптов и правил для самостоятельной работы. Для навыков с кодом на этом этап концепции заканчивается: код не пишется."}, {"id": "11", "title": "Навыки-услуги: готовые документы и материалы", "deps": ["09"], "ks": ["К12"], "what": "Для навыков вида «услуга» и методик агент проходит весь путь и выпускает документы и материалы: оффер, пакеты, скрипты, расчёты, план подготовки, записку о данных. Расчёты выполняются в песочнице с видимым кодом, внешние факты приходят со ссылкой и датой, цифры помечены типом."}, {"id": "12", "title": "«Сработало» и счётчик", "deps": ["10", "11"], "ks": ["К13"], "what": "Человек приносит результат на своей реальной задаче, агент сверяет его с критериями навыка и просит нажать «Сработало». Навык попадает в счётчик только после автотеста, результата и кнопки; опыт начисляется только по событию-доказательству, тип подтверждения записывается."}, {"id": "13", "title": "Журнал решений и публикация в тему группы", "deps": ["02", "04"], "ks": ["К14"], "what": "Каждое сильное решение записывается по стандарту Б. Публичная часть публикуется в тему человека, у каждого решения есть выключатель «сделать приватным». Приватное и личное в группу не попадает."}, {"id": "14", "title": "Учёт расхода, Free-лимит и грант", "deps": ["04"], "ks": ["К16", "К17"], "what": "Расход каждого вызова модели записывается по данным ответа провайдера. Free-лимит около 10 ходов в день с предупреждением на 80%, первая сессия без лимита. Грант $40 в месяц, наценка ×1,3 и пороги 50 и 1000 кредитов лежат в настройках. Команды `/budget`, `/costs`, `/limits` показывают данные по правам."}, {"id": "15", "title": "Отчёты и расписания", "deps": ["02", "04"], "ks": ["К19"], "what": "Сессия закрывается отчётом после 40 минут тишины или по `/report`. Арсену приходит ежедневный дайджест отчётов в 21:00 МСК, напоминания о лайве по средам 20:20 приходят за 24 часа и за 1 час. Расписания не дублируются при перезапуске и видны владельцу."}, {"id": "16", "title": "Приватность данных: /forget_me", "deps": ["07"], "ks": ["К21"], "what": "Участник удаляет свой профиль и диалоги одной командой. Строка о передаче данных внешним провайдерам показана в приветствии Mini App."}, {"id": "17", "title": "Сценарные тесты агента и навыков", "deps": ["12", "13"], "ks": ["К22"], "what": "Двенадцать сценариев агента и сценарии `test.yaml` всех навыков прогоняются на тестовом боте моделью-судьёй по чек-листу; результаты видны владельцу. Настоящая модель используется после получения ключа."}], "skills": [{"name": "automation-build", "title": "Делаю автоматизацию", "branch": "automation", "kind": "build", "src": "studio", "mine": true, "lvl": 3}, {"name": "virtual-employees", "title": "Создаю виртуальных сотрудников", "branch": "automation", "kind": "build", "src": "studio", "mine": true, "lvl": 3}, {"name": "app-with-ai", "title": "Делаю приложение с ИИ", "branch": "code", "kind": "build", "src": "studio", "mine": true, "lvl": 3}, {"name": "claude-code-basics", "title": "Claude Code: установка, рабочая папка, контекст, CLAUDE.md", "branch": "code", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 1}, {"name": "db-registration-demo", "title": "База данных и форма регистрации (демо пути данных)", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 3}, {"name": "git-basics", "title": "Git и GitHub: установка, репозиторий, коммит, откат", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 2}, {"name": "git-branches", "title": "Ветки под фичи", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 2}, {"name": "ngrok-share", "title": "Публичная ссылка на локальный проект (ngrok)", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 2}, {"name": "pgadmin-connect", "title": "Подключение pgAdmin к локальной базе", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 2}, {"name": "project-init", "title": "Инициализация проекта", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 2}, {"name": "site-with-ai", "title": "Делаю сайт с ИИ", "branch": "code", "kind": "build", "src": "studio", "mine": true, "lvl": 2}, {"name": "stack-md", "title": "Стек проекта", "branch": "code", "kind": "method", "src": "lesson-02", "mine": false, "lvl": 2}, {"name": "sell-ai-courses", "title": "Продаю курсы по ИИ", "branch": "content", "kind": "deliver", "src": "studio", "mine": true, "lvl": 3}, {"name": "tutor-oge-ege", "title": "Репетитор ОГЭ и ЕГЭ", "branch": "content", "kind": "deliver", "src": "studio", "mine": true, "lvl": 2}, {"name": "routine-audit", "title": "Разбор рутины в часах и деньгах", "branch": "personal", "kind": "deliver", "src": "studio", "mine": false, "lvl": 1}, {"name": "features-roadmap", "title": "Функционал итогового продукта", "branch": "product", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 2}, {"name": "mvp-scope", "title": "Состав MVP", "branch": "product", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 1}, {"name": "competitors-analysis", "title": "Поиск и анализ конкурентов", "branch": "research", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 2}, {"name": "competitors-quick-check", "title": "Быстрая проверка конкурентов", "branch": "research", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 2}, {"name": "complaints-analysis", "title": "Разбор жалоб на конкурентов", "branch": "research", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 3}, {"name": "ai-consulting", "title": "Консультирую по ИИ", "branch": "sales", "kind": "deliver", "src": "studio", "mine": true, "lvl": 2}, {"name": "casdev-questions", "title": "Вопросы для касдев-интервью", "branch": "sales", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 1}, {"name": "ai-agency", "title": "Своё ИИ-агентство", "branch": "strategy", "kind": "deliver", "src": "studio", "mine": true, "lvl": 3}, {"name": "idea-card", "title": "Карточка идеи", "branch": "strategy", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 1}, {"name": "idea-interview", "title": "Интервью для поиска идеи", "branch": "strategy", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 1}, {"name": "idea-validation", "title": "Валидация идеи", "branch": "strategy", "kind": "method", "src": "lesson-01", "mine": false, "lvl": 1}]};
+var BR = {strategy:"Стратегия",research:"Исследования",sales:"Клиенты и продажи",product:"Продукт",code:"Код",design:"Дизайн",content:"Контент","video-voice":"Видео и голос",automation:"Автоматизация",personal:"Личная эффективность"};
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+var PILL = {done:"Пройдено",now:"Следующий шаг",later:"Впереди"};
+
+/* станции */
+(function(){
+  var list=document.getElementById("routeList"), mini=document.getElementById("mini"), h="", m="";
+  STOPS.forEach(function(s){
+    var li = function(a){return "<li>"+a+"</li>"};
+    h += "<li class='stop "+s.s+"' id='st"+s.n+"'><span class='node'></span><details class='card'"+(s.here?" open":"")+"><summary>"+
+      "<span><span class='num'>СТАНЦИЯ "+s.n+"</span><h3>"+esc(s.t)+(s.here?"<span class='hereflag'>вы здесь</span>":"")+"</h3></span>"+
+      "<span class='pill "+s.s+"'>"+PILL[s.s]+"<span class='chev'>›</span></span>"+
+      "<span class='one'>"+esc(s.one)+"</span></summary><div class='body'>"+
+      "<div><h4>Что сделано</h4><ul>"+s.did.map(li).join("")+"</ul></div>"+
+      "<div><h4>Где лежит</h4><ul>"+s.where.map(li).join("")+"</ul></div>"+
+      "<div><h4>Результат</h4><ul>"+s.res.map(li).join("")+"</ul></div></div></details></li>";
+    m += "<button type='button' data-n='"+s.n+"' role='listitem' aria-label='Станция "+s.n+": "+esc(s.t)+"'><span class='bar "+s.s+"'><i></i></span><span class='n'>"+s.n+"</span><span class='here'>"+(s.here?"вы здесь":"")+"</span></button>";
+  });
+  list.innerHTML=h; mini.innerHTML=m;
+  mini.addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    var el=document.getElementById("st"+b.getAttribute("data-n"));
+    el.querySelector("details").open=true; el.scrollIntoView({behavior:"smooth",block:"center"});
+  });
+})();
+
+/* дерево */
+(function(){
+  function node(n){
+    if(n.f) return "<div class='f"+(n.plan?" plan":"")+"'><span class='name'>"+esc(n.f)+"</span><span class='d'>"+esc(n.d||"")+"</span></div>";
+    var inner=(n.ch||[]).map(node).join("");
+    if(!inner) inner="<div class='f'><span class='d'>появится вместе с кодом</span></div>";
+    return "<details"+(n.plan?" class='plan'":"")+"><summary><span class='name'>"+esc(n.d)+"/</span>"+(n.plan?"<span class='badge'>будет</span>":"")+" <span class='d'>"+esc(n.c||"")+"</span></summary>"+inner+"</details>";
+  }
+  var el=document.getElementById("tree"); el.innerHTML=TREE.map(node).join("");
+  var first=el.querySelectorAll("details"); if(first[0]) first[0].open=true;
+  [1,2].forEach(function(i){});
+})();
+
+/* задачи */
+(function(){
+  var T=DATA.tasks, grid=document.getElementById("taskGrid"), info=document.getElementById("taskInfo"), sel=null;
+  grid.innerHTML=T.map(function(t){
+    var ready=t.deps.length===0;
+    return "<button type='button' class='task' data-id='"+t.id+"' data-ready='"+(ready?1:0)+"'>"+(ready?"<span class='go'>можно брать сразу</span>":"")+
+      "<span class='tn'>"+t.id+"</span><span class='tt'>"+esc(t.title)+"</span><span class='tm'>"+(t.deps.length?"после: "+t.deps.join(", "):"без зависимостей")+(t.ks.length?" · закрывает "+t.ks.join(", "):"")+"</span></button>";
+  }).join("");
+  function clear(){[].forEach.call(grid.children,function(c){c.classList.remove("sel","dep","after")})}
+  grid.addEventListener("click",function(e){
+    var b=e.target.closest(".task"); if(!b) return;
+    var id=b.getAttribute("data-id"); clear();
+    if(sel===id){sel=null; info.textContent="Выберите задачу, чтобы увидеть, что в ней строится."; return}
+    sel=id; var t=T.filter(function(x){return x.id===id})[0];
+    b.classList.add("sel");
+    t.deps.forEach(function(d){var c=grid.querySelector("[data-id='"+d+"']"); if(c) c.classList.add("dep")});
+    var opens=T.filter(function(x){return x.deps.indexOf(id)>-1}).map(function(x){return x.id});
+    opens.forEach(function(d){var c=grid.querySelector("[data-id='"+d+"']"); if(c) c.classList.add("after")});
+    info.innerHTML="<b>"+t.id+". "+esc(t.title)+"</b><br>"+esc(t.what)+
+      "<br><span style='color:var(--muted)'>Сначала нужны: "+(t.deps.length?t.deps.join(", "):"ничего")+". Откроет: "+(opens.length?opens.join(", "):"ничего, это конец цепочки")+".</span>";
+  });
+  document.querySelector("#tasks .toolbar").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    var f=b.getAttribute("data-f");
+    [].forEach.call(grid.children,function(c){c.classList.toggle("hide",f==="ready"&&c.getAttribute("data-ready")!=="1")});
+  });
+})();
+
+/* навыки */
+(function(){
+  var S=DATA.skills, grid=document.getElementById("branchGrid");
+  var order=["strategy","research","sales","product","code","design","content","video-voice","automation","personal"];
+  function group(s){ if(s.mine) return "mine"; if(s.src.indexOf("lesson")===0) return "lesson"; return "studio"; }
+  grid.innerHTML=order.map(function(b){
+    var items=S.filter(function(s){return s.branch===b});
+    return "<div class='branch'><h3>"+BR[b]+"<span>"+items.length+"</span></h3>"+
+      (items.length? items.map(function(s){return "<div class='sk' data-g='"+group(s)+"'><span class='k "+(s.kind==="method"?"":s.kind)+"'>"+s.kind+"</span><span>"+esc(s.title)+"<span class='nm'>"+s.name+"</span></span></div>"}).join("") : "<div class='empty'>пока пусто, придёт с волной 2</div>")+"</div>";
+  }).join("");
+  document.getElementById("skillFilter").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    var f=b.getAttribute("data-f");
+    [].forEach.call(grid.querySelectorAll(".sk"),function(r){r.classList.toggle("hide",f!=="all"&&r.getAttribute("data-g")!==f)});
+  });
+})();
+</script>
+</body>
+</html>
