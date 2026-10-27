@@ -2,6 +2,7 @@ from alembic import context
 from sqlalchemy import create_engine
 
 from app.config import Settings
+import app.db.models  # noqa: F401  (registers tables on the metadata)
 from app.db.base import Base
 
 target_metadata = Base.metadata

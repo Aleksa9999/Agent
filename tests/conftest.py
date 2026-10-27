@@ -1,9 +1,23 @@
+import os
 from pathlib import Path
 
 import pytest
 import yaml
+from aiogram import Bot
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from app.bot.repo import BotRepo
+from app.bot.runtime import BotRuntime
+from app.config import Settings
+from app.db.base import Base, Tenant
+from app.i18n import Translator
+from app.tenants import TenantRegistry
+from tests.fake_telegram import GROUP_ID, FakeSession
 
 ROOT = Path(__file__).resolve().parent.parent
+OWNER_ID = 42
+WEBHOOK_SECRET = "webhook-secret-for-tests"
 
 
 @pytest.fixture
@@ -34,3 +48,47 @@ def partner_tenant(tenants_dir: Path) -> Path:
         encoding="utf-8",
     )
     return tenants_dir
+
+
+@pytest.fixture
+def settings(tmp_path: Path, tenants_dir: Path) -> Settings:
+    return Settings(
+        app_env="test",
+        tenants_dir=tenants_dir,
+        locales_dir=ROOT / "locales",
+        database_url=os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{tmp_path / 'bot.db'}",
+        group_chat_id=GROUP_ID,
+        owner_tg_id=OWNER_ID,
+        tg_webhook_secret=WEBHOOK_SECRET,
+    )
+
+
+@pytest.fixture
+def engine(settings: Settings):
+    engine = create_engine(settings.sqlalchemy_url)
+    Base.metadata.drop_all(
+        engine
+    )  # clean slate (matters when TEST_DATABASE_URL points at Postgres)
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(Tenant(id="default", brand_name="Googlagent", locale="ru"))
+        session.commit()
+    return engine
+
+
+@pytest.fixture
+def session() -> FakeSession:
+    return FakeSession()
+
+
+@pytest.fixture
+def runtime(settings: Settings, engine, session: FakeSession) -> BotRuntime:
+    tenants = TenantRegistry.load(settings.tenants_dir)
+    bot = Bot(token="123456:TESTTOKEN", session=session)
+    return BotRuntime(
+        settings=settings,
+        tenants=tenants,
+        translator=Translator(settings.locales_dir, tenants),
+        repo=BotRepo(engine),
+        bot_factory=lambda tenant_id: bot,
+    )

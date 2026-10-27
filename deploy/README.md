@@ -21,6 +21,10 @@ Nginx and certbot run on the host (`deploy/nginx.conf` is the site template).
 3. `make stack-up`.
 4. `curl http://127.0.0.1:8000/health` must answer `{"status":"ok", ...}` and show both `db` and `redis` as `ok`.
 5. Copy `deploy/nginx.conf` to Nginx, replace `APP_DOMAIN`, run certbot, reload Nginx.
+6. Register the webhook and menus once: `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml exec bot-api python -m app.bot.setup`.
+7. In the test group make the bot an administrator with the rights to manage topics, pin and delete messages. Turn off privacy mode in BotFather.
+
+Also set `TG_WEBHOOK_SECRET` (a long random value), `GROUP_CHAT_ID`, `OWNER_TG_ID` and `WEBAPP_URL` (the public https address of this server).
 
 Use the test bot token (`TG_TEST_BOT_TOKEN`) and the test group. The production token is touched only after the owner approves with `/deploy_approve`.
 

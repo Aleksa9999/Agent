@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     tg_bot_token: SecretStr | None = None
     tg_test_bot_token: SecretStr | None = None
+    tg_webhook_secret: SecretStr | None = None
     fernet_key: SecretStr | None = None
     qwen_api_key: SecretStr | None = None
     dashscope_api_key: SecretStr | None = None
