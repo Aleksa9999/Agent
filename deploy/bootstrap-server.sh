@@ -37,8 +37,8 @@ check() {
   say "disk   : $((disk_kb / 1024 / 1024)) GB free   (needs at least $((MIN_DISK_KB / 1024 / 1024)) GB)"
   say "cpu    : ${cpus} core(s)"
   if command -v docker >/dev/null 2>&1; then say "docker : $(docker --version)"; else say "docker : not installed"; fi
-  if [[ "${os_id}" != "ubuntu" ]] || [[ "${version}" != "22.04" && "${version}" != "24.04" ]]; then
-    say "PROBLEM: Ubuntu 22.04 or 24.04 is expected"; problems=1
+  if [[ "${os_id}" != "ubuntu" ]] || [[ "${version}" != "22.04" && "${version}" != "24.04" && "${version}" != "26.04" ]]; then
+    say "PROBLEM: Ubuntu 22.04, 24.04 or 26.04 is expected"; problems=1
   fi
   if (( ram_kb < MIN_RAM_KB )); then say "PROBLEM: not enough memory for the stack and its builds"; problems=1; fi
   if (( disk_kb < MIN_DISK_KB )); then say "PROBLEM: not enough free disk space"; problems=1; fi
@@ -52,17 +52,22 @@ install_all() {
   apt-get update
   apt-get install -y ca-certificates curl git ufw nginx certbot python3-certbot-nginx openssl
   if ! command -v docker >/dev/null 2>&1; then
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    chmod a+r /etc/apt/keyrings/docker.asc
     local codename arch
     # shellcheck disable=SC1091
     codename="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
     arch="$(dpkg --print-architecture)"
-    echo "deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${codename} stable" \
-      > /etc/apt/sources.list.d/docker.list
-    apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    if curl -fsI "https://download.docker.com/linux/ubuntu/dists/${codename}/Release" >/dev/null 2>&1; then
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      echo "deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${codename} stable" \
+        > /etc/apt/sources.list.d/docker.list
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    else
+      say "Docker's own repository has no packages for '${codename}' yet: using the Ubuntu packages"
+      apt-get install -y docker.io docker-compose-v2
+    fi
   fi
   # builds of the Mini App can spike in memory: a swap file is a cheap safety net
   if [[ -z "$(swapon --show --noheadings)" ]]; then

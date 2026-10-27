@@ -44,9 +44,13 @@ def test_the_current_890_mb_server_is_rejected(tmp_path):
     assert "not enough memory" in result.stdout and "not enough free disk" in result.stdout
 
 
+def test_the_newest_ubuntu_lts_is_accepted(tmp_path):
+    assert _check(tmp_path, version="26.04").returncode == 0
+
+
 def test_other_systems_are_rejected(tmp_path):
     result = _check(tmp_path, ident="debian", version="12")
-    assert result.returncode == 1 and "Ubuntu 22.04 or 24.04" in result.stdout
+    assert result.returncode == 1 and "Ubuntu 22.04, 24.04 or 26.04" in result.stdout
 
 
 def _write_env(tmp_path, answers: str):
