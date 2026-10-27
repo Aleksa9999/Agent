@@ -37,8 +37,20 @@ def _alembic(url: str, *args: str) -> None:
     )
 
 
+def _empty_database(url: str) -> None:
+    """A shared Postgres may hold tables left by other tests; migrations need an empty one."""
+    if url.startswith("sqlite"):
+        return
+    engine = sa.create_engine(url.replace("postgresql://", "postgresql+psycopg2://"))
+    with engine.begin() as connection:
+        connection.execute(sa.text("DROP SCHEMA public CASCADE"))
+        connection.execute(sa.text("CREATE SCHEMA public"))
+    engine.dispose()
+
+
 def test_migrations_go_up_and_down(tmp_path):
     url = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{tmp_path / 'm.db'}"
+    _empty_database(url)
     _alembic(url, "upgrade", "head")
     engine = sa.create_engine(
         url if url.startswith("sqlite") else url.replace("postgresql://", "postgresql+psycopg2://")

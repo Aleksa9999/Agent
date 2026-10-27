@@ -75,7 +75,9 @@ def engine(settings: Settings):
     with Session(engine) as session:
         session.add(Tenant(id="default", brand_name="Googlagent", locale="ru"))
         session.commit()
-    return engine
+    yield engine
+    Base.metadata.drop_all(engine)  # leave a shared Postgres empty for the migration test
+    engine.dispose()
 
 
 @pytest.fixture
