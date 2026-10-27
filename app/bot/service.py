@@ -193,6 +193,8 @@ class OnboardingService:
 
     # private chat --------------------------------------------------------
     async def handle_start(self, user: User, chat_id: int) -> None:
+        if self.is_owner(user.id):
+            await self.sync_owner_commands()
         async with self._lock((self.tenant_id, user.id)):
             row = await self.upsert_user(user)
             await self.repo.update_user(row.id, dm_chat_id=chat_id)
@@ -278,11 +280,23 @@ class OnboardingService:
     # menus ---------------------------------------------------------------
     async def sync_commands(self) -> None:
         """Everyone sees the public commands; only the owner's chat also gets the owner commands."""
-        public = [BotCommand(command=c, description=self.t(f"cmd_{c}")) for c in PUBLIC_COMMANDS]
-        owner = [BotCommand(command=c, description=self.t(f"cmd_{c}")) for c in OWNER_COMMANDS]
-        await self.bot.set_my_commands(public, scope=BotCommandScopeDefault())
+        await self.bot.set_my_commands(self._public_commands(), scope=BotCommandScopeDefault())
         await self.sync_menu_button()
-        if self.settings.owner_tg_id is not None:
+        await self.sync_owner_commands()
+
+    def _public_commands(self) -> list[BotCommand]:
+        return [BotCommand(command=c, description=self.t(f"cmd_{c}")) for c in PUBLIC_COMMANDS]
+
+    async def sync_owner_commands(self) -> None:
+        """Telegram cannot address the owner's chat until the owner has written to the bot once;
+        in that case the menu is installed later, when the owner sends /start."""
+        owner_id = self.settings.owner_tg_id
+        if owner_id is None:
+            return
+        owner = [BotCommand(command=c, description=self.t(f"cmd_{c}")) for c in OWNER_COMMANDS]
+        try:
             await self.bot.set_my_commands(
-                public + owner, scope=BotCommandScopeChat(chat_id=self.settings.owner_tg_id)
+                self._public_commands() + owner, scope=BotCommandScopeChat(chat_id=owner_id)
             )
+        except TelegramBadRequest as exc:
+            log.warning("owner menu postponed until the owner sends /start: %s", exc.message)

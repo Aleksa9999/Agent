@@ -17,6 +17,7 @@ class FakeSession(BaseSession):
         self.calls: list[tuple[str, Any]] = []
         self.private_topics_supported = True
         self.drafts_supported = True
+        self.known_chats: set[int] | None = None  # None: every chat is reachable
         self._thread = 100
         self._message = 0
 
@@ -37,6 +38,10 @@ class FakeSession(BaseSession):
             raise TelegramBadRequest(method=method, message="Bad Request: topics are not enabled")
         if name == "sendMessageDraft" and not self.drafts_supported:
             raise TelegramBadRequest(method=method, message="Bad Request: drafts are not available")
+        scope_chat = getattr(getattr(method, "scope", None), "chat_id", None)
+        if name == "setMyCommands" and scope_chat is not None and self.known_chats is not None:
+            if scope_chat not in self.known_chats:
+                raise TelegramBadRequest(method=method, message="Bad Request: chat not found")
         result: Any = True
         if name == "getMe":
             result = {"id": 999, "is_bot": True, "first_name": "Bot", "username": BOT_USERNAME}

@@ -173,3 +173,17 @@ def test_webhook_processes_an_update_and_rejects_unknown_tenants(settings, runti
     assert ok.status_code == 200 and len(session.of("createForumTopic")) == 4
     missing = client.post("/telegram/webhook/nobody", json={}, headers=headers)
     assert missing.status_code == 404
+
+
+async def test_setup_survives_an_owner_who_has_not_written_to_the_bot_yet(runtime, session):
+    session.known_chats = set()  # Telegram: "chat not found" for the owner's chat
+    await runtime.setup("default", "https://app.example.test")
+    assert len(session.of("setWebhook")) == 1  # the webhook is registered anyway
+    menus = session.of("setMyCommands")
+    assert len(menus) == 2 and menus[1].scope.chat_id == OWNER_ID  # tried, did not crash
+
+    session.known_chats = {OWNER_ID}  # the owner presses /start
+    session.calls.clear()
+    await runtime.feed("default", command_update(OWNER, "/start"))
+    (owner_menu,) = session.of("setMyCommands")
+    assert [c.command for c in owner_menu.commands][-2:] == ["admin", "members"]
