@@ -3,6 +3,7 @@
 import hmac
 import logging
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 
 import redis
 from fastapi import FastAPI, Request
@@ -15,6 +16,7 @@ from app.bot.roles import RoleRegistry
 from app.bot.runtime import BotRuntime
 from app.config import Settings, get_settings
 from app.db.session import make_engine
+from app.db.tenants_sync import sync_tenants
 from app.i18n import Translator
 from app.logging_setup import setup_logging
 from app.miniapp_api.auth import InvalidInitDataError, verify_init_data
@@ -51,10 +53,21 @@ def create_app(
 ) -> FastAPI:
     settings = settings or get_settings()
     setup_logging()
-    app = FastAPI(title="Googlagent", docs_url=None, redoc_url=None, openapi_url=None)
-    health_checks = checks if checks is not None else default_checks(settings)
     tenants = TenantRegistry.load(settings.tenants_dir)  # a broken tenant file stops startup
     tenants.get(settings.default_tenant)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            sync_tenants(make_engine(settings), tenants)
+        except Exception as exc:  # the app must still start: /health will show a broken database
+            log.error("tenants were not synced: %s", type(exc).__name__)
+        yield
+
+    app = FastAPI(
+        title="Googlagent", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
+    )
+    health_checks = checks if checks is not None else default_checks(settings)
     runtimes: list[BotRuntime] = [runtime] if runtime else []
 
     def get_runtime() -> BotRuntime:

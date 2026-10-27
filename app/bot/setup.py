@@ -8,6 +8,7 @@ from app.bot.repo import BotRepo
 from app.bot.runtime import BotRuntime
 from app.config import get_settings
 from app.db.session import make_engine
+from app.db.tenants_sync import sync_tenants
 from app.i18n import Translator
 from app.tenants import TenantRegistry
 
@@ -16,6 +17,7 @@ async def _main(tenant_id: str | None) -> None:
     settings = get_settings()
     tenants = TenantRegistry.load(settings.tenants_dir)
     engine = make_engine(settings)
+    sync_tenants(engine, tenants)
     runtime = BotRuntime(
         settings=settings,
         tenants=tenants,

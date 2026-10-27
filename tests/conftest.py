@@ -12,6 +12,7 @@ from app.bot.repo import BotRepo
 from app.bot.runtime import BotRuntime
 from app.config import Settings
 from app.db.base import Base, Tenant
+from app.db.session import enable_sqlite_foreign_keys
 from app.i18n import Translator
 from app.tenants import TenantRegistry
 from tests.fake_telegram import GROUP_ID, FakeSession
@@ -66,7 +67,7 @@ def settings(tmp_path: Path, tenants_dir: Path) -> Settings:
 
 @pytest.fixture
 def engine(settings: Settings):
-    engine = create_engine(settings.sqlalchemy_url)
+    engine = enable_sqlite_foreign_keys(create_engine(settings.sqlalchemy_url))
     Base.metadata.drop_all(
         engine
     )  # clean slate (matters when TEST_DATABASE_URL points at Postgres)
