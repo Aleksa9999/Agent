@@ -20,6 +20,7 @@ from app.bot.publisher import GroupPublisher
 from app.bot.repo import BotRepo
 from app.bot.roles import RoleRegistry
 from app.bot.service import OnboardingService
+from app.bot.skill_flow import SkillFlow
 from app.bot.voice import VoiceIntake
 from app.config import Settings
 from app.i18n import Translator
@@ -28,6 +29,7 @@ from app.profile.passport import PassportStore
 from app.profile.service import ProfileService
 from app.profile.store import ProfileStore
 from app.ratelimit import RateLimiter
+from app.skills.runs import SkillRunService, SkillRunStore
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 from app.track.service import FirstResultService, HomeService, TrackService
@@ -49,6 +51,7 @@ class BotRuntime:
         profiles: ProfileStore | None = None,
         passports: PassportStore | None = None,
         user_skills: UserSkillStore | None = None,
+        skill_runs: SkillRunStore | None = None,
         first_results: FirstResultStore | None = None,
         asr_factory: Callable[[str], AsrPort | None] | None = None,
         bot_factory: Callable[[str], Bot] | None = None,
@@ -63,6 +66,9 @@ class BotRuntime:
         self.profiles = profiles
         self.passports = passports
         self.user_skills = user_skills
+        self.skill_runs = skill_runs
+        self._run_services: dict[str, SkillRunService] = {}
+        self._flows: dict[str, SkillFlow] = {}
         self.first_results = first_results
         self.first_result_limiter = RateLimiter(limit=3, window_seconds=600)
         self._homes: dict[str, HomeService] = {}
@@ -176,6 +182,33 @@ class BotRuntime:
             )
         return self._voice[tenant_id]
 
+    def runs(self, tenant_id: str) -> SkillRunService | None:
+        """Going through a skill; None when the stores were not given."""
+        if self.skill_runs is None or self.skills is None:
+            return None
+        if tenant_id not in self._run_services:
+            self._run_services[tenant_id] = SkillRunService(
+                store=self.skill_runs,
+                skills=self.skills,
+                translator=self.translator,
+                prompts_dir=self.settings.prompts_dir,
+                rules_path=self.settings.spec_rules_path,
+            )
+        return self._run_services[tenant_id]
+
+    def flow(self, tenant_id: str) -> SkillFlow | None:
+        runs = self.runs(tenant_id)
+        if runs is None:
+            return None
+        if tenant_id not in self._flows:
+            self._flows[tenant_id] = SkillFlow(
+                svc=self.service(tenant_id),
+                chat=self.chat(tenant_id),
+                runs=runs,
+                catalog=ModelCatalog.load(self.settings.model_catalog_path),
+            )
+        return self._flows[tenant_id]
+
     def chat(self, tenant_id: str) -> AgentChat:
         if tenant_id not in self._chats:
             svc = self.service(tenant_id)
@@ -206,6 +239,7 @@ class BotRuntime:
                 agent=agent,
                 prompts_dir=self.settings.prompts_dir,
                 methods_index=skill_names(self.settings.skills_dir),
+                runs=self.runs(tenant_id),
             )
         return self._chats[tenant_id]
 
@@ -230,6 +264,7 @@ class BotRuntime:
             dp["svc"] = self.service(tenant_id)
             dp["chat"] = self.chat(tenant_id)
             dp["voice"] = self.voice(tenant_id)
+            dp["flow"] = self.flow(tenant_id)
             self._dispatchers[tenant_id] = dp
         return self._dispatchers[tenant_id]
 

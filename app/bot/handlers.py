@@ -16,6 +16,7 @@ from app.bot.service import (
     parse_context_callback,
     parse_skill_callback,
 )
+from app.bot.skill_flow import SkillFlow, parse_flow_callback
 from app.bot.voice import VoiceIntake
 
 
@@ -70,6 +71,15 @@ def build_router() -> Router:
             await svc.handle_document(
                 message.from_user, message.chat.id, message.document, message.caption
             )
+
+    @router.callback_query(F.data.func(lambda data: parse_flow_callback(data) is not None))
+    async def on_flow_button(
+        query: CallbackQuery, svc: OnboardingService, flow: SkillFlow | None
+    ) -> None:
+        if flow is None:
+            await query.answer(svc.t("stale_button"), show_alert=True)
+            return
+        await flow.on_button(query)
 
     @router.callback_query(F.data.func(lambda data: parse_skill_callback(data) is not None))
     async def on_skill_button(query: CallbackQuery, svc: OnboardingService) -> None:

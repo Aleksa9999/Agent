@@ -7,19 +7,26 @@ import time
 from pathlib import Path
 
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-from aiogram.types import CallbackQuery, Message, MessageGenerationStopped
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    MessageGenerationStopped,
+)
 from aiogram.types import User as TgUser
 
 from app.agent.context import ContextInputs
 from app.agent.model import ModelError
-from app.agent.orchestrator import Agent, Done, OptionsAsked
+from app.agent.orchestrator import Agent, Done, OptionsAsked, SpecProposed
 from app.agent.prompts import load_prompt
 from app.agent.store import AgentStore
 from app.agent.types import Message as AgentMessage
 from app.agent.types import TextDelta
 from app.bot import options_ui
 from app.bot.repo import KeyedLock, UserRow
-from app.bot.service import OnboardingService
+from app.bot.service import BLUE, CALLBACK_VERSION, OnboardingService
+from app.skills.runs import RunScope, SkillRunService
 
 log = logging.getLogger("app.bot")
 
@@ -41,7 +48,9 @@ class AgentChat:
         agent: Agent | None,
         prompts_dir: Path,
         methods_index: str,
+        runs: SkillRunService | None = None,
     ):
+        self.runs = runs
         self.svc = svc
         self.store = store
         self.agent = agent
@@ -102,6 +111,8 @@ class AgentChat:
             return
         await self.store.set_question(stored.id, "answered")
         await query.answer()
+        if action == "unknown":
+            await self._journal_unknown(row, stored.context_key, question)
         if message:
             await self._close_question(message, question, action)
         text = {
@@ -111,6 +122,22 @@ class AgentChat:
         chat_id = message.chat.id if message else row.dm_chat_id or query.from_user.id
         thread_id = message.message_thread_id if message else None
         await self._turn(row, query.from_user, chat_id, thread_id, stored.context_key, text)
+
+    async def _journal_unknown(self, row, context, question) -> None:
+        """ "I don't know" inside a skill: the agent takes the recommended option, and it is
+        written into the journal at once so that the question is not asked again."""
+        run, _ = await self._skill_scope(row, context)
+        if run is None or self.runs is None:
+            return
+        star = question.options[question.recommended_index]
+        await self.runs.record_decision(
+            self.tenant,
+            run.id,
+            question.text,
+            star.title,
+            "agent",
+            self.svc.t("decision_unknown_why"),
+        )
 
     async def _close_question(self, message: Message, question, action: str) -> None:
         """Remove the buttons and keep the question text, so the history stays readable."""
@@ -132,6 +159,19 @@ class AgentChat:
                 return kind
         return row.active_context or DEFAULT_CONTEXT
 
+    async def turn_for(self, row, user, chat_id, thread_id, context, text) -> None:
+        """A turn started by the platform itself (a skill button), not by a typed message."""
+        await self._turn(row, user, chat_id, thread_id, context, text)
+
+    async def _skill_scope(self, row, context):
+        """The skill the person is going through, once the road is chosen."""
+        if self.runs is None or context != "dm_skills":
+            return None, None
+        run = await self.runs.active(self.tenant, row.id)
+        if run is None or run.road is None:
+            return None, None
+        return run, RunScope(self.runs, self.tenant, run.id)
+
     async def _turn(self, row, user, chat_id, thread_id, context, text) -> None:
         bot = self.svc.bot
         if self.agent is None:
@@ -145,6 +185,7 @@ class AgentChat:
             stored = await self.store.history(self.tenant, row.id, context, after_id=upto)
             await self.store.add_message(self.tenant, row.id, context, "user", text)
             name = self.svc.display_name(user)
+            run, scope = await self._skill_scope(row, context)
             inputs = ContextInputs(
                 constitution=load_prompt(
                     self.prompts_dir,
@@ -161,16 +202,19 @@ class AgentChat:
                 summary=summary,
                 history=[AgentMessage(m.role, m.content) for m in stored],  # type: ignore[arg-type]
                 current=text,
+                skill_context=self.runs.context(self.tenant, run) if run and self.runs else None,
+                tool_scope=scope,
             )
-            await self._stream(inputs, row, chat_id, thread_id, context, stored)
+            await self._stream(inputs, row, chat_id, thread_id, context, stored, run)
 
-    async def _stream(self, inputs, row, chat_id, thread_id, context, stored) -> None:
+    async def _stream(self, inputs, row, chat_id, thread_id, context, stored, run=None) -> None:
         bot = self.svc.bot
         draft_id = secrets.randbelow(2**31 - 1) + 1
         cancel = asyncio.Event()
         self._active[chat_id] = (draft_id, cancel)
         parts: list[str] = []
         question = None
+        spec_text: str | None = None
         done: Done | None = None
         drafts_ok = True
         last_push = 0.0
@@ -184,6 +228,8 @@ class AgentChat:
                         drafts_ok = await self._push_draft(chat_id, thread_id, draft_id, parts)
                 elif isinstance(event, OptionsAsked):
                     question = event.question
+                elif isinstance(event, SpecProposed):
+                    spec_text = event.text
                 elif isinstance(event, Done):
                     done = event
         except ModelError as exc:
@@ -206,6 +252,10 @@ class AgentChat:
             )
         if question is not None:
             await self._send_question(row, chat_id, thread_id, context, question)
+        if spec_text is not None and run is not None:
+            await self._send_spec(row, chat_id, thread_id, context, run.id, spec_text)
+        if run is not None and question is None and self.runs is not None:
+            await self.runs.reset_batch(self.tenant, run.id)  # a block of questions ended
 
     async def _push_draft(self, chat_id, thread_id, draft_id, parts) -> bool:
         try:
@@ -221,6 +271,38 @@ class AgentChat:
         except (TelegramBadRequest, TelegramForbiddenError) as exc:
             log.info("streaming drafts unavailable: %s", type(exc).__name__)
             return False  # the final message is still sent
+
+    async def _send_spec(self, row, chat_id, thread_id, context, run_id, spec_text) -> None:
+        """The spec goes to the person with "Agree" and "Fix"; nothing is saved before that."""
+        t = self.svc.t
+        current = await self.runs.get(self.tenant, run_id) if self.runs else None
+        rev = current.spec_rev if current else 0
+        full = spec_text + "\n\n" + t("spec_ask")
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=t("spec_agree"),
+                        callback_data=f"{CALLBACK_VERSION}:spec:ok:{run_id}:{rev}",
+                        style=BLUE,
+                    ),
+                    InlineKeyboardButton(
+                        text=t("spec_fix"),
+                        callback_data=f"{CALLBACK_VERSION}:spec:fix:{run_id}:{rev}",
+                    ),
+                ]
+            ]
+        )
+        chunks = _chunks(full)
+        for index, chunk in enumerate(chunks):
+            last = index == len(chunks) - 1
+            await self.svc.bot.send_message(
+                chat_id=chat_id,
+                message_thread_id=thread_id,
+                text=chunk,
+                reply_markup=keyboard if last else None,
+            )
+        await self.store.add_message(self.tenant, row.id, context, "assistant", full)
 
     async def _send_question(self, row, chat_id, thread_id, context, question) -> None:
         text = options_ui.render_text(question, self.svc.t("option_star"))

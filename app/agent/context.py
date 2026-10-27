@@ -29,6 +29,7 @@ class ContextInputs:
     history: list[Message] = field(default_factory=list)
     current: str = ""
     attachments: list[str] = field(default_factory=list)
+    tool_scope: object | None = None  # what the tools of this turn may touch (a skill run)
 
 
 @dataclass

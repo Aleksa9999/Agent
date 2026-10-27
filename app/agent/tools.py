@@ -14,9 +14,11 @@ from app.agent.options import QUESTION_SCHEMA, InvalidQuestionError, Question, p
 from app.agent.prompts import load_prompt
 from app.agent.types import FunctionSpec, Message, ModelRequest, ToolCall, Usage
 from app.i18n import Translator
+from app.skills.runs import BATCH_LIMIT, RunScope, SpecError
 
 log = logging.getLogger("app.agent")
 
+RUN_HANDLERS = {"record_decision": "_record_decision", "propose_spec": "_propose_spec"}
 RESEARCH_TOOLS = ("web_search", "web_extractor")
 SANDBOX_TOOLS = ("code_interpreter", "web_search", "web_extractor")
 
@@ -26,6 +28,7 @@ class ToolOutput:
     text: str
     question: Question | None = None  # set by ask_options: the turn ends and the person answers
     usage: Usage | None = None
+    spec_text: str | None = None  # set by propose_spec: the turn ends and the person decides
 
 
 def _simple(name: str, description: str, field: str, field_doc: str) -> FunctionSpec:
@@ -69,6 +72,41 @@ SPECS = (
 )
 
 
+RUN_SPECS = (
+    FunctionSpec(
+        "record_decision",
+        "Write a decision into the journal: what was decided and by whom. Use decided_by=agent "
+        "when the person said 'decide for me' or 'I do not know'.",
+        {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string"},
+                "decision": {"type": "string"},
+                "decided_by": {"type": "string", "enum": ["person", "agent"]},
+                "why": {"type": "string"},
+            },
+            "required": ["question", "decision", "decided_by"],
+        },
+    ),
+    FunctionSpec(
+        "propose_spec",
+        "Show the person the spec of the skill result. It is saved only when the person presses "
+        "Agree. Criteria describe what the person will see or check.",
+        {
+            "type": "object",
+            "properties": {
+                "how_it_looks": {"type": "string"},
+                "criteria": {"type": "array", "items": {"type": "string"}},
+                "out_of_scope": {"type": "array", "items": {"type": "string"}},
+                "seams": {"type": "array", "items": {"type": "string"}},
+                "assumptions": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["how_it_looks", "criteria", "out_of_scope"],
+        },
+    ),
+)
+
+
 class ToolRegistry:
     def __init__(
         self,
@@ -87,13 +125,16 @@ class ToolRegistry:
         self._prompts = prompts_dir
         self._today = today
 
-    def specs(self) -> tuple[FunctionSpec, ...]:
-        return SPECS
+    def specs(self, scope: object | None = None) -> tuple[FunctionSpec, ...]:
+        """The skill-run tools exist only while the person is going through a skill."""
+        return SPECS + RUN_SPECS if isinstance(scope, RunScope) else SPECS
 
     def _t(self, key: str, **values: object) -> str:
         return self._tr.t(self._tenant, key, **values)
 
-    async def run(self, call: ToolCall) -> ToolOutput:
+    async def run(self, call: ToolCall, scope: object | None = None) -> ToolOutput:
+        if isinstance(scope, RunScope) and call.name in RUN_HANDLERS:
+            return await getattr(self, RUN_HANDLERS[call.name])(call.arguments, scope)
         handlers = {
             "ask_options": self._ask_options,
             "run_research": self._research,
@@ -104,12 +145,55 @@ class ToolRegistry:
         if handler is None:
             return ToolOutput(f"unknown tool: {call.name}")
         try:
+            if call.name == "ask_options" and isinstance(scope, RunScope):
+                return await self._ask_in_run(call.arguments, scope)
             return await handler(call.arguments)
         except ModelError as exc:
             log.warning("tool %s failed: %s", call.name, exc)
             return ToolOutput(
                 "The tool is temporarily unavailable. Tell the person you could not check."
             )
+
+    async def _ask_in_run(self, arguments: dict, scope: RunScope) -> ToolOutput:
+        """A question inside a skill: at most five in a block, and never one already decided."""
+        out = await self._ask_options(arguments)
+        if out.question is None:
+            return out
+        run = await scope.service.get(scope.tenant, scope.run_id)
+        if run is not None:
+            decided = scope.service.find_decision(run, out.question.text)
+            if decided is not None:
+                return ToolOutput(
+                    f"already decided: {decided['decision']}. Do not ask again; go on."
+                )
+        count = await scope.service.count_question(scope.tenant, scope.run_id)
+        if count is not None and count > BATCH_LIMIT:
+            return ToolOutput(
+                "block limit reached: five questions are asked. Do not ask more now. Say in two "
+                "sentences what you understood, and what is still open."
+            )
+        return out
+
+    async def _record_decision(self, arguments: dict, scope: RunScope) -> ToolOutput:
+        ok = await scope.service.record_decision(
+            scope.tenant,
+            scope.run_id,
+            str(arguments.get("question", "")),
+            str(arguments.get("decision", "")),
+            str(arguments.get("decided_by", "agent")),
+            str(arguments.get("why", "")),
+        )
+        return ToolOutput("recorded" if ok else "not recorded: question and decision are required")
+
+    async def _propose_spec(self, arguments: dict, scope: RunScope) -> ToolOutput:
+        run = await scope.service.get(scope.tenant, scope.run_id)
+        if run is None:
+            return ToolOutput("the skill run is gone")
+        try:
+            text = await scope.service.propose_spec(scope.tenant, run, arguments)
+        except SpecError as exc:
+            return ToolOutput(f"spec rejected, fix and call propose_spec again: {exc}")
+        return ToolOutput("the spec is shown to the person with the buttons", spec_text=text)
 
     async def _ask_options(self, arguments: dict) -> ToolOutput:
         try:

@@ -38,6 +38,11 @@ class OptionsAsked:
     question: Question
 
 
+@dataclass(frozen=True)
+class SpecProposed:
+    text: str
+
+
 @dataclass
 class Done:
     text: str
@@ -48,7 +53,7 @@ class Done:
     stopped: bool = False
 
 
-AgentEvent = TextDelta | ToolStarted | OptionsAsked | Done
+AgentEvent = TextDelta | ToolStarted | OptionsAsked | SpecProposed | Done
 
 
 class Agent:
@@ -106,7 +111,7 @@ class Agent:
                 mode="mentor",
                 instructions=built.instructions,
                 messages=list(messages),
-                functions=self._tools.specs(),
+                functions=self._tools.specs(inputs.tool_scope),
                 stream=True,
             )
             calls: list[ToolCall] = []
@@ -131,11 +136,15 @@ class Agent:
             messages.append(Message("assistant", "".join(turn_text), tuple(calls)))
             for call in calls:
                 yield ToolStarted(call.name)
-                output = await self._tools.run(call)
+                output = await self._tools.run(call, inputs.tool_scope)
                 if output.usage:
                     usage.add(output.usage)
                 if output.question is not None:
                     yield OptionsAsked(output.question)
+                    yield done()
+                    return
+                if output.spec_text is not None:
+                    yield SpecProposed(output.spec_text)
                     yield done()
                     return
                 messages.append(Message("tool", output.text, tool_call_id=call.id))

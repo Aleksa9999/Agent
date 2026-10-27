@@ -25,6 +25,7 @@ from app.miniapp_api.profile import register_profile_routes
 from app.profile.passport import PassportStore
 from app.profile.store import ProfileStore
 from app.skills.catalog import catalog_view
+from app.skills.runs import SkillRunStore
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 from app.track.store import FirstResultStore, UserSkillStore
@@ -104,6 +105,7 @@ def create_app(
                     passports=PassportStore(engine),
                     user_skills=UserSkillStore(engine),
                     first_results=FirstResultStore(engine),
+                    skill_runs=SkillRunStore(engine),
                 )
             )
         return runtimes[0]

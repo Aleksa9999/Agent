@@ -123,6 +123,18 @@ class SkillStore:
             return None
         return parse_skill(max(rows, key=lambda r: version_number(r.version)).skill_md)
 
+    def text(self, tenant_id: str, slug: str, version: str) -> str | None:
+        """The SKILL.md of a published version."""
+        with self._sessions() as s:
+            return s.scalar(
+                select(SkillVersion.skill_md).where(
+                    SkillVersion.tenant_id == tenant_id,
+                    SkillVersion.slug == slug,
+                    SkillVersion.version == version,
+                    SkillVersion.status == PUBLISHED,
+                )
+            )
+
     def versions(self, tenant_id: str, slug: str) -> list[str]:
         with self._sessions() as s:
             rows = s.scalars(

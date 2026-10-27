@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { type Catalog, type CatalogSkill, loadCatalog } from "@/lib/catalog";
 import { type Locale, t, tByName } from "@/lib/messages";
+import { StartSkillButton } from "./start-skill";
 
 type Props = { locale: Locale; initData: string; tenant: string };
 type View = { kind: "loading" } | { kind: "error" } | { kind: "ready"; catalog: Catalog };
@@ -33,7 +34,7 @@ export function CatalogScreen({ locale, initData, tenant }: Props) {
       </>
     );
   }
-  if (open) return <SkillCard locale={locale} skill={open} onBack={() => setOpen(null)} />;
+  if (open) return <SkillCard locale={locale} skill={open} initData={initData} tenant={tenant} onBack={() => setOpen(null)} />;
 
   return (
     <section className="flex flex-col gap-6">
@@ -78,7 +79,19 @@ export function CatalogScreen({ locale, initData, tenant }: Props) {
   );
 }
 
-function SkillCard({ locale, skill, onBack }: { locale: Locale; skill: CatalogSkill; onBack: () => void }) {
+function SkillCard({
+  locale,
+  skill,
+  initData,
+  tenant,
+  onBack,
+}: {
+  locale: Locale;
+  skill: CatalogSkill;
+  initData: string;
+  tenant: string;
+  onBack: () => void;
+}) {
   return (
     <article className="flex flex-col gap-5">
       <button type="button" onClick={onBack} className="self-start text-[var(--tg-hint)]">
@@ -90,6 +103,7 @@ function SkillCard({ locale, skill, onBack }: { locale: Locale; skill: CatalogSk
           {tByName(locale, `branch_${skill.branch}`)} · {t(locale, "skill_version", { version: skill.version })}
         </p>
       </header>
+      <StartSkillButton locale={locale} initData={initData} tenant={tenant} slug={skill.slug} />
       <section className="flex flex-col gap-2">
         <h3 className="font-medium">{t(locale, "road_title")}</h3>
         <ul className="flex flex-col gap-1 text-sm">

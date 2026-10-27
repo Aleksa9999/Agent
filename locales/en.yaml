@@ -168,3 +168,35 @@ card_country: Country and language
 pf_unknown_text: don't know
 pass_public_header: 'Member profile: {name}'
 pass_public_line: '• {label}: {text}'
+tier_economy: Economy
+tier_standard: Standard
+tier_premium: Premium
+run_intro: Starting the skill “{title}”. First choose the road.
+run_roads: '• The agent does it: the platform leads the work, you accept the result.
+
+  • I do it myself: I give a prompt pack and the order of steps, you work on your side.'
+run_code_note: For skills with code the platform now takes the work to a spec, tasks and a prompt pack; the project code is written later.
+run_estimate_head: 'Estimate by AI box tier:'
+run_estimate_tier: '{tier}: {roles}'
+run_road_agent: The agent does it
+run_road_self: I do it myself
+run_road_agent_text: 'Starting the skill “{title}”. Road: the agent does it.'
+run_road_self_text: 'Starting the skill “{title}”. Road: I do it myself.'
+run_stale: This button was already used or is out of date.
+spec_title: Spec of the skill “{title}”
+spec_h_how: What the finished result looks like
+spec_h_criteria: Acceptance criteria
+spec_h_out: Out of scope
+spec_h_seams: How we check
+spec_h_assumptions: What I assumed myself, correct me
+spec_h_decided: What I decided for you
+spec_criterion: C{n}. {text}
+spec_bullet: • {text}
+spec_decided_line: '• {question}: {decision}'
+spec_ask: Do you agree with this spec? I do not save it until you press “Agree”.
+spec_agree: Agree
+spec_fix: Fix
+spec_saved: The spec is saved.
+spec_agreed_text: The spec is agreed and saved. Go on.
+spec_fix_text: The spec needs fixing. Ask what exactly is wrong and propose a new one.
+decision_unknown_why: 'after your “I don''t know”: the recommended option was taken'

@@ -16,6 +16,7 @@ from app.db.session import enable_sqlite_foreign_keys
 from app.i18n import Translator
 from app.profile.passport import PassportStore
 from app.profile.store import ProfileStore
+from app.skills.runs import SkillRunStore
 from app.skills.store import SkillStore
 from app.tenants import TenantRegistry
 from app.track.store import FirstResultStore, UserSkillStore
@@ -63,6 +64,7 @@ def settings(tmp_path: Path, tenants_dir: Path) -> Settings:
         tenants_dir=tenants_dir,
         locales_dir=ROOT / "locales",
         database_url=os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{tmp_path / 'bot.db'}",
+        spec_rules_path=ROOT / "config" / "spec_rules.yaml",
         privacy_patterns_path=ROOT / "config" / "privacy_patterns.yaml",
         group_chat_id=GROUP_ID,
         owner_tg_id=OWNER_ID,
@@ -118,6 +120,11 @@ def first_result_store(engine) -> FirstResultStore:
 
 
 @pytest.fixture
+def skill_run_store(engine) -> SkillRunStore:
+    return SkillRunStore(engine)
+
+
+@pytest.fixture
 def make_runtime(
     settings: Settings,
     engine,
@@ -127,6 +134,7 @@ def make_runtime(
     passport_store,
     user_skill_store,
     first_result_store,
+    skill_run_store,
 ):
     """Builds a runtime; the model and the speech recogniser are scripted per test."""
 
@@ -144,6 +152,7 @@ def make_runtime(
             passports=passport_store,
             user_skills=user_skill_store,
             first_results=first_result_store,
+            skill_runs=skill_run_store,
             bot_factory=lambda tenant_id: bot,
             model_factory=lambda tenant_id: model,
             asr_factory=lambda tenant_id: asr,

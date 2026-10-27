@@ -1,0 +1,17 @@
+# Rules a spec proposal must pass before it is shown to the person.
+# A criterion describes what the person can see or check, not work that was done.
+# Lowercase word starts that mark a criterion as "work done" instead of "observable":
+work_done_prefixes:
+  - реализован
+  - сделан
+  - написан
+  - добавлен
+  - создан
+  - implemented
+  - done
+  - written
+  - added
+  - created
+min_criterion_chars: 15
+max_criteria: 15
+min_how_chars: 20

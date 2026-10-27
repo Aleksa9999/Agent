@@ -145,5 +145,11 @@
   "track_study": "Учёба, ОГЭ или ЕГЭ",
   "track_ai_services": "Услуги по ИИ",
   "track_teach": "Хочу обучать",
-  "track_automation": "Автоматизация и сотрудники"
+  "track_automation": "Автоматизация и сотрудники",
+  "skill_start": "Начать навык",
+  "skill_started": "Открыл навык в чате: там выбор дороги и смета. Вернитесь в чат.",
+  "skill_error_no_chat": "Сначала откройте чат с ботом и нажмите Start.",
+  "skill_error_unknown_skill": "Такого навыка нет в каталоге.",
+  "skill_error_unavailable": "Запуск навыка сейчас недоступен.",
+  "skill_error_network": "Нет связи. Проверьте интернет и повторите."
 }

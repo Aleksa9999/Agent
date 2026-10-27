@@ -183,3 +183,28 @@ class FirstResult(TenantMixin, Base):
     code: Mapped[str | None] = mapped_column(Text)
     seconds: Mapped[float] = mapped_column(nullable=False, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SkillRun(TenantMixin, Base):
+    """One person going through one skill: road, decisions the agent took for them, and the spec.
+
+    status: active (the current skill), paused (another skill was started), done.
+    spec_status: none, proposed (shown, waiting for the person), saved (the person agreed)."""
+
+    __tablename__ = "skill_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[str] = mapped_column(String(8), nullable=False)
+    road: Mapped[str | None] = mapped_column(String(8))
+    phase: Mapped[str] = mapped_column(String(12), nullable=False, default="road")
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="active")
+    decisions: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    spec: Mapped[dict | None] = mapped_column(JSON)
+    spec_text: Mapped[str | None] = mapped_column(Text)
+    spec_status: Mapped[str] = mapped_column(String(10), nullable=False, default="none")
+    spec_rev: Mapped[int] = mapped_column(nullable=False, default=0)
+    batch_asked: Mapped[int] = mapped_column(nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

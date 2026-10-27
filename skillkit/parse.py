@@ -117,3 +117,20 @@ def check_bundle(skill_md: str, test_yaml: str) -> tuple[list[str], SkillDoc | N
         (folder / "SKILL.md").write_text(skill_md, encoding="utf-8")
         (folder / TEST_FILE).write_text(test_yaml, encoding="utf-8")
         return check_skill(folder / "SKILL.md"), doc
+
+
+def section_texts(text: str, names: tuple[str, ...]) -> dict[str, str]:
+    """The body of the named `## ` sections of a skill (missing ones are left out)."""
+    match = FRONTMATTER.match(text)
+    body = match.group(2) if match else text
+    found = {}
+    for name in names:
+        content = _section(body, name)
+        if content:
+            found[name] = content
+    return found
+
+
+# the sections a running skill needs in the agent's context
+RUN_SECTIONS = ("Назначение", "Допрос", "Критерии приёмки", "Отказы и границы")
+PIPELINE_SECTION = "Конвейер"

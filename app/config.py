@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     qwen_fast_model: str | None = None
     qwen_asr_model: str | None = None
     qwen_asr_base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    spec_rules_path: Path = Path("config/spec_rules.yaml")
     privacy_patterns_path: Path = Path("config/privacy_patterns.yaml")
     model_catalog_path: Path = Path("config/model_catalog.yaml")
     context_budget_tokens: int = 60000

@@ -1,6 +1,7 @@
 """Mini App endpoints of "My Googlagent": the home view and the first result."""
 
 import logging
+import re
 from collections.abc import Callable
 
 from fastapi import FastAPI, Request
@@ -17,6 +18,7 @@ log = logging.getLogger("app.miniapp")
 Authenticate = Callable[[str, Request], TelegramUser | JSONResponse]
 STATUS = {"not_ready": 409, "need_text": 422, "unavailable": 503, "failed": 502}
 TEXT_LIMIT = 6000
+SLUG = re.compile(r"[a-z0-9-]{1,64}")
 
 
 def _no_store(body: dict, status: int = 200) -> JSONResponse:
@@ -58,6 +60,21 @@ def register_home_routes(
         except FirstResultError as exc:
             return _no_store({"error": exc.reason}, STATUS.get(exc.reason, 500))
         return _no_store({"result": result, "home": await home.view(tenant_id, user_id)})
+
+    @app.post("/api/miniapp/{tenant_id}/skills/{slug}/start")
+    async def start_skill(tenant_id: str, slug: str, request: Request) -> JSONResponse:
+        """Open a skill in the chat: the estimate and the choice of the road arrive there."""
+        user = authenticate(tenant_id, request)
+        if isinstance(user, JSONResponse):
+            return user
+        flow = get_runtime().flow(tenant_id)
+        if flow is None or not SLUG.fullmatch(slug):
+            return _no_store({"error": "unavailable" if flow is None else "unknown_skill"}, 404)
+        outcome = await flow.start(user.id, slug)
+        status = {"ok": 200, "no_chat": 409, "unknown_skill": 404}[outcome]
+        return _no_store(
+            {"started": outcome == "ok", "error": None if outcome == "ok" else outcome}, status
+        )
 
     @app.get("/api/miniapp/{tenant_id}/home")
     async def read_home(tenant_id: str, request: Request) -> JSONResponse:

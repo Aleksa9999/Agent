@@ -6,6 +6,7 @@ import { type FirstResult, type Home, loadHome, runFirstResult, runFirstResultVo
 import { type Locale, type MessageKey, t, tByName } from "@/lib/messages";
 import { parseBlocks } from "@/lib/markdown";
 import { type Recording, browserMicSupport, startRecording } from "@/lib/recorder";
+import { StartSkillButton } from "./start-skill";
 
 type Props = { locale: Locale; initData: string; tenant: string; refreshKey: number };
 
@@ -48,6 +49,9 @@ export function HomeScreen({ locale, initData, tenant, refreshKey }: Props) {
                 {t(locale, skill.status === "verified" ? "home_status_verified" : "home_status_unverified")}
                 {skill.extra ? ` · ${t(locale, "home_extra")}` : ""}
               </p>
+              <div className="pt-2">
+                <StartSkillButton locale={locale} initData={initData} tenant={tenant} slug={skill.slug} />
+              </div>
             </li>
           ))}
         </ul>

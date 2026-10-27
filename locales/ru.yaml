@@ -168,3 +168,35 @@ card_country: Страна и язык
 pf_unknown_text: не знаю
 pass_public_header: 'Профиль участника: {name}'
 pass_public_line: '• {label}: {text}'
+tier_economy: Эконом
+tier_standard: Стандарт
+tier_premium: Премиум
+run_intro: Запускаю навык «{title}». Сначала выберите дорогу.
+run_roads: '• Делает агент: платформа ведёт работу, вы принимаете результат.
+
+  • Пройду сам: я даю пакет промптов и порядок шагов, вы работаете у себя.'
+run_code_note: Для навыков с кодом сейчас платформа доводит работу до спеки, задач и пакета промптов; код проекта пишется позже.
+run_estimate_head: 'Смета по уровням коробки ИИ:'
+run_estimate_tier: '{tier}: {roles}'
+run_road_agent: Делает агент
+run_road_self: Пройду сам
+run_road_agent_text: 'Начинаем навык «{title}». Дорога: делает агент.'
+run_road_self_text: 'Начинаем навык «{title}». Дорога: пройду сам.'
+run_stale: Эта кнопка уже сработала или устарела.
+spec_title: Спека навыка «{title}»
+spec_h_how: Как выглядит готовое
+spec_h_criteria: Критерии приёмки
+spec_h_out: Вне рамок
+spec_h_seams: Как проверим
+spec_h_assumptions: Что я додумал сам, поправьте
+spec_h_decided: Что я решил за вас
+spec_criterion: К{n}. {text}
+spec_bullet: • {text}
+spec_decided_line: '• {question}: {decision}'
+spec_ask: Согласны с такой спекой? Пока вы не нажмёте «Согласен», я её не записываю.
+spec_agree: Согласен
+spec_fix: Поправить
+spec_saved: Спека записана.
+spec_agreed_text: Спека согласована и записана. Продолжай.
+spec_fix_text: Спеку нужно поправить. Спроси, что именно не так, и предложи новую.
+decision_unknown_why: 'по вашему «не знаю»: взят рекомендованный вариант'
