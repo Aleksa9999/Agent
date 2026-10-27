@@ -18,7 +18,8 @@ Telegram-бот и Mini App: персональный ИИ-агент студи
 ## Правила
 
 - Язык кода и идентификаторов английский, тексты для людей русские в файлах i18n; ничего не вписывать в код строкой.
-- Тесты: `python3 -I tools/validate_skills.py` (навыки) — работает сейчас. Команды тестов бота и Mini App появятся с кодом и впишутся сюда.
+- Тесты и проверки: `make check` (линтер, все тесты, валидатор навыков). Отдельно: `python3 -m pytest`, `python3 -I tools/validate_skills.py`. Без Docker стек поднимается командой `make native-up`.
+- Раскладка кода: `app/` (бот, агент, база), `config/tenants/*.yaml` (бренды), `locales/*.yaml` (все тексты для людей), `deploy/` (запуск, бэкап, откат), `tests/`.
 - Секреты только в `.env` на сервере (`chmod 600`), раздельно для test и prod. Не печатать их в вывод, логи, коммиты, отчёты и чат. Архивы с паролями не открывать.
 - Переменные окружения: `QWEN_API_KEY`, `QWEN_BASE_URL`, `QWEN_MODEL`, `QWEN_FAST_MODEL`, `DASHSCOPE_API_KEY`, `TG_BOT_TOKEN`, `TG_TEST_BOT_TOKEN`, `OWNER_TG_ID`, `GROUP_CHAT_ID`, `WEBAPP_URL`, `DATABASE_URL`, `REDIS_URL`, `FERNET_KEY`, `GITHUB_TOKEN`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`.
 - ID моделей и цены не хардкодить: настройки и `model_catalog`. Цены в навыках только в виде ролей моделей.

@@ -5,12 +5,14 @@
   - frontmatter: все обязательные поля, значения из допустимых наборов;
   - обязательные разделы тела (из _FORMAT.md);
   - критерии приёмки К1…Кn нумерованы подряд без пропусков и их не меньше min_criteria;
-  - test.yaml: парсится, есть static, scenarios (>=1, у каждого must и must_not), pass_score, real_run_proof;
+  - test.yaml: парсится, есть static, scenarios (не меньше одного, у каждого must и must_not),
+    pass_score и real_run_proof;
   - slug совпадает с именем каталога, ветка совпадает с родительским каталогом;
   - в тексте навыка нет секретов (простые паттерны) и нет «голых» цен в валюте без пометки (пример).
 Запуск: python3 -I tools/validate_skills.py [корень репозитория]
 Код выхода 0, если всё прошло, иначе 1.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -20,13 +22,54 @@ import yaml
 ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
 SK = ROOT / "content" / "skills"
 
-BRANCHES = {"strategy", "research", "sales", "product", "code", "design", "content", "video-voice", "automation", "personal"}
+BRANCHES = {
+    "strategy",
+    "research",
+    "sales",
+    "product",
+    "code",
+    "design",
+    "content",
+    "video-voice",
+    "automation",
+    "personal",
+}
 KINDS = {"build", "deliver", "method"}
 RUNS = {"dev-skills", "direct"}
 SOURCES = {"studio", "lesson-01", "lesson-02", "client", "market"}
-REQ_FM = ["name", "title", "branch", "version", "kind", "runs_via", "min_level", "triggers", "inputs", "outputs", "box_tiers", "autotest", "source"]
-REQ_SECTIONS = ["Назначение", "Когда включать", "Адаптация под паспорт", "Допрос", "Конвейер", "Коробка ИИ", "Критерии приёмки", "Отказы и границы", "Доказательство «Сработало»"]
-SECRET_PATTERNS = [r"sk-[A-Za-z0-9]{20,}", r"ghp_[A-Za-z0-9]{20,}", r"AKIA[0-9A-Z]{16}", r"-----BEGIN [A-Z ]*PRIVATE KEY-----", r"\b\d{9,10}:[A-Za-z0-9_-]{30,}\b"]
+REQ_FM = [
+    "name",
+    "title",
+    "branch",
+    "version",
+    "kind",
+    "runs_via",
+    "min_level",
+    "triggers",
+    "inputs",
+    "outputs",
+    "box_tiers",
+    "autotest",
+    "source",
+]
+REQ_SECTIONS = [
+    "Назначение",
+    "Когда включать",
+    "Адаптация под паспорт",
+    "Допрос",
+    "Конвейер",
+    "Коробка ИИ",
+    "Критерии приёмки",
+    "Отказы и границы",
+    "Доказательство «Сработало»",
+]
+SECRET_PATTERNS = [
+    r"sk-[A-Za-z0-9]{20,}",
+    r"ghp_[A-Za-z0-9]{20,}",
+    r"AKIA[0-9A-Z]{16}",
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+    r"\b\d{9,10}:[A-Za-z0-9_-]{30,}\b",
+]
 
 
 def check_skill(skill_md: Path):

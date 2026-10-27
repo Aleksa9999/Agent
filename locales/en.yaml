@@ -1,0 +1,3 @@
+greeting: "Hi! I am {brand}, your personal AI agent. Tell me about yourself by voice and we will begin."
+start_button: "Start with my agent"
+health_ok: "Everything is running."

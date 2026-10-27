@@ -1,0 +1,8 @@
+# Production stack. Switching the live bot to it needs the owner's approval (/deploy_approve).
+services:
+  bot-api:
+    environment:
+      APP_ENV: prod
+    env_file: ${ENV_FILE:-../.env.prod}
+    ports:
+      - "127.0.0.1:8100:8000"

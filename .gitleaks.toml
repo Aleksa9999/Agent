@@ -1,0 +1,10 @@
+title = "googlagent"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "documentation placeholders"
+paths = [
+  '''^\.env\.example$''',
+]

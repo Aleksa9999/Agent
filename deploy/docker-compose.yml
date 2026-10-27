@@ -1,0 +1,52 @@
+# Base stack. Run it through an override: deploy/docker-compose.test.yml or deploy/docker-compose.prod.yml
+# Secrets come from the env file named by ENV_FILE (.env.test or .env.prod on the server).
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: googlagent
+      POSTGRES_USER: googlagent
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the env file}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U googlagent -d googlagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in the env file}"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  bot-api:
+    build: ..
+    image: googlagent:${TAG:-local}
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-../.env.test}
+    environment:
+      DATABASE_URL: postgresql://googlagent:${POSTGRES_PASSWORD}@db:5432/googlagent
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status == 200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app_factory --factory --host 0.0.0.0 --port 8000"]
+
+volumes:
+  db-data:

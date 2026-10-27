@@ -1,0 +1,6 @@
+id: default
+brand_name: Googlagent
+locale: ru
+bot_token_env: TG_BOT_TOKEN
+test_bot_token_env: TG_TEST_BOT_TOKEN
+webapp_url_env: WEBAPP_URL

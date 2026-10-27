@@ -1,0 +1,7 @@
+# Test stack: the test bot and the test group only. One command: make stack-up
+services:
+  bot-api:
+    environment:
+      APP_ENV: test
+    ports:
+      - "127.0.0.1:8000:8000"

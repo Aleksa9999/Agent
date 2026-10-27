@@ -1,0 +1,16 @@
+# Install once: pip install pre-commit && make hooks
+# The secret scan uses the gitleaks binary on your PATH (https://github.com/gitleaks/gitleaks/releases).
+repos:
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: gitleaks git --staged --redact --no-banner --config .gitleaks.toml
+        language: system
+        pass_filenames: false
+        always_run: true
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+      - id: ruff-format
