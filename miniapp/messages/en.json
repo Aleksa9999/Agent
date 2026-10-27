@@ -1,0 +1,14 @@
+{
+  "loading": "Opening…",
+  "outside_title": "Open from Telegram",
+  "outside_body": "This app works inside Telegram only. Open the bot and press “Open Googlagent”.",
+  "expired_title": "Session expired",
+  "expired_body": "Close this window and open the app from the bot again.",
+  "denied_title": "Could not confirm your sign-in",
+  "denied_body": "Close this window and open the app from the bot again. If that does not help, contact the studio owner.",
+  "error_title": "Service unavailable",
+  "error_body": "Could not reach the server. Please try again in a minute.",
+  "retry": "Retry",
+  "hello": "Hi, {name}!",
+  "ready_body": "Sign-in confirmed. The placement test will appear here: tell me about yourself by voice."
+}

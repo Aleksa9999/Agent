@@ -10,11 +10,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.bot.repo import BotRepo
+from app.bot.roles import RoleRegistry
 from app.bot.runtime import BotRuntime
 from app.config import Settings, get_settings
 from app.db.session import make_engine
 from app.i18n import Translator
 from app.logging_setup import setup_logging
+from app.miniapp_api.auth import InvalidInitDataError, verify_init_data
 from app.tenants import TenantRegistry
 
 log = logging.getLogger("app")
@@ -84,6 +86,33 @@ def create_app(
             "checks": results,
         }
         return JSONResponse(body, status_code=200 if ok else 503)
+
+    @app.post("/api/miniapp/{tenant_id}/session")
+    def miniapp_session(tenant_id: str, request: Request) -> JSONResponse:
+        """Opens a Mini App session. Only launch data signed by Telegram is accepted."""
+        if tenant_id not in tenants.ids():
+            return JSONResponse({"error": "unknown_tenant"}, status_code=404)
+        token = tenants.bot_token(tenant_id, test=settings.app_env == "test")
+        if not token:
+            return JSONResponse({"error": "not_configured"}, status_code=503)
+        scheme, _, init_data = request.headers.get("Authorization", "").partition(" ")
+        if scheme.lower() != "tma":
+            return JSONResponse({"error": "missing"}, status_code=401)
+        try:
+            user = verify_init_data(
+                init_data, token, max_age_seconds=settings.miniapp_initdata_max_age
+            )
+        except InvalidInitDataError as exc:
+            return JSONResponse({"error": exc.reason}, status_code=401)
+        tenant = tenants.get(tenant_id)
+        role = RoleRegistry(settings.owner_tg_id).role_of(user.id)
+        return JSONResponse(
+            {
+                "user": {"id": user.id, "first_name": user.first_name, "role": role},
+                "brand": tenant.brand_name,
+                "locale": tenant.locale,
+            }
+        )
 
     @app.post("/telegram/webhook/{tenant_id}")
     async def telegram_webhook(tenant_id: str, request: Request) -> JSONResponse:

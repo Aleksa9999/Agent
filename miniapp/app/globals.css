@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+:root {
+  --tg-bg: var(--tg-theme-bg-color, #ffffff);
+  --tg-text: var(--tg-theme-text-color, #111827);
+  --tg-hint: var(--tg-theme-hint-color, #6b7280);
+  --tg-button: var(--tg-theme-button-color, #2563eb);
+  --tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+}
+
+body {
+  background: var(--tg-bg);
+  color: var(--tg-text);
+}

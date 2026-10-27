@@ -9,13 +9,14 @@ This guide never contains secrets, server addresses or domains. Real values live
 |---|---|
 | `db` | PostgreSQL 16, data in a Docker volume |
 | `redis` | Redis 7 with a password, internal network only |
-| `bot-api` | FastAPI app: `/health` now; Telegram webhook and Mini App API in later slices |
+| `bot-api` | FastAPI app: `/health`, Telegram webhook, Mini App session API |
+| `miniapp` | Next.js Mini App opened from Telegram (served on `/`; the API lives under `/api`) |
 
 Nginx and certbot run on the host (`deploy/nginx.conf` is the site template).
 
 ## First start of the test stack (about 15 minutes)
 
-1. Copy `.env.example` to `.env.test` and fill it. Add two lines for the stack itself:
+1. Copy `.env.example` to `.env.test` and fill it, including `TG_WEBHOOK_SECRET`, `GROUP_CHAT_ID`, `OWNER_TG_ID` and `WEBAPP_URL` (the public https address of this server). Add two lines for the stack itself:
    `POSTGRES_PASSWORD=` and `REDIS_PASSWORD=` (long random values; enter them on the server, do not paste them into chats).
 2. `chmod 600 .env.test`.
 3. `make stack-up`.
@@ -23,8 +24,6 @@ Nginx and certbot run on the host (`deploy/nginx.conf` is the site template).
 5. Copy `deploy/nginx.conf` to Nginx, replace `APP_DOMAIN`, run certbot, reload Nginx.
 6. Register the webhook and menus once: `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml exec bot-api python -m app.bot.setup`.
 7. In the test group make the bot an administrator with the rights to manage topics, pin and delete messages. Turn off privacy mode in BotFather.
-
-Also set `TG_WEBHOOK_SECRET` (a long random value), `GROUP_CHAT_ID`, `OWNER_TG_ID` and `WEBAPP_URL` (the public https address of this server).
 
 Use the test bot token (`TG_TEST_BOT_TOKEN`) and the test group. The production token is touched only after the owner approves with `/deploy_approve`.
 
@@ -46,4 +45,4 @@ Use the test bot token (`TG_TEST_BOT_TOKEN`) and the test group. The production 
 
 ## Checks
 
-`make check` runs the linter, all tests and the skill validator. CI runs the same checks plus a secret scan of the whole Git history.
+`make check` runs the linter, all tests, the skill validator and the Mini App checks (types, tests, build). CI runs the same checks plus a secret scan of the whole Git history.

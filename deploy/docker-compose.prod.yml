@@ -6,3 +6,6 @@ services:
     env_file: ${ENV_FILE:-../.env.prod}
     ports:
       - "127.0.0.1:8100:8000"
+  miniapp:
+    ports:
+      - "127.0.0.1:3100:3000"

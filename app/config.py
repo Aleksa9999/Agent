@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     owner_tg_id: int | None = None
     group_chat_id: int | None = None
     webapp_url: str | None = None
+    miniapp_initdata_max_age: int = 3600
 
     tg_bot_token: SecretStr | None = None
     tg_test_bot_token: SecretStr | None = None

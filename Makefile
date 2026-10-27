@@ -1,4 +1,4 @@
-.PHONY: hooks install lint test check stack-up stack-down native-up native-down validate-skills
+.PHONY: miniapp-check hooks install lint test check stack-up stack-down native-up native-down validate-skills
 
 hooks:
 	pre-commit install
@@ -15,7 +15,10 @@ test:
 validate-skills:
 	python3 -I tools/validate_skills.py
 
-check: lint test validate-skills
+miniapp-check:
+	cd miniapp && npm ci && npm run typecheck && npm test && npm run build
+
+check: lint test validate-skills miniapp-check
 
 # Test stack in Docker (the server). ENV_FILE defaults to .env.test, created from .env.example.
 stack-up:

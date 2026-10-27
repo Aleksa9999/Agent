@@ -15,7 +15,11 @@ from aiogram.types import (
     BotCommandScopeDefault,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
+    MenuButtonWebApp,
+    ReplyKeyboardMarkup,
     User,
+    WebAppInfo,
 )
 
 from app.bot.repo import BotRepo, KeyedLock, UserRow
@@ -35,6 +39,10 @@ OWNER_COMMANDS = ("admin", "members")
 
 def context_callback(kind: str) -> str:
     return f"{CALLBACK_VERSION}:ctx:{kind}"
+
+
+MINIAPP_LATER = f"{CALLBACK_VERSION}:miniapp:later"
+BLUE = "primary"  # button style that Telegram draws in blue
 
 
 def parse_context_callback(data: str | None) -> str | None:
@@ -133,6 +141,56 @@ class OnboardingService:
             inline_keyboard=[[InlineKeyboardButton(text=self.t("start_button"), url=link)]]
         )
 
+    # Mini App entry ------------------------------------------------------
+    def miniapp_url(self) -> str | None:
+        """The Mini App address for this tenant. Telegram only accepts https."""
+        base = (self.settings.webapp_url or "").rstrip("/")
+        if not base.startswith("https://"):
+            return None
+        return f"{base}/?tenant={self.tenant_id}"
+
+    def miniapp_keyboard(self) -> ReplyKeyboardMarkup | None:
+        """The always-visible blue button above the keyboard."""
+        url = self.miniapp_url()
+        if url is None:
+            return None
+        button = KeyboardButton(
+            text=self.t("open_miniapp"), web_app=WebAppInfo(url=url), style=BLUE
+        )
+        return ReplyKeyboardMarkup(keyboard=[[button]], is_persistent=True, resize_keyboard=True)
+
+    async def offer_miniapp(self, chat_id: int, thread_id: int | None = None) -> None:
+        """Ask before opening: the app opens only after the person presses Open."""
+        url = self.miniapp_url()
+        if url is None:
+            log.warning("WEBAPP_URL is not an https address: the Mini App offer is skipped")
+            return
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=self.t("miniapp_open"), web_app=WebAppInfo(url=url), style=BLUE
+                    ),
+                    InlineKeyboardButton(text=self.t("miniapp_later"), callback_data=MINIAPP_LATER),
+                ]
+            ]
+        )
+        await self.bot.send_message(
+            chat_id=chat_id,
+            message_thread_id=thread_id,
+            text=self.t("miniapp_offer"),
+            reply_markup=keyboard,
+        )
+
+    async def sync_menu_button(self) -> None:
+        """The permanent menu button next to the input field opens the Mini App."""
+        url = self.miniapp_url()
+        if url is None:
+            return
+        await self.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text=self.t("open_miniapp"), web_app=WebAppInfo(url=url))
+        )
+
     # private chat --------------------------------------------------------
     async def handle_start(self, user: User, chat_id: int) -> None:
         async with self._lock((self.tenant_id, user.id)):
@@ -165,9 +223,15 @@ class OnboardingService:
                     chat_id=chat_id,
                     message_thread_id=intro_thread,
                     text=self.t("dm_ready", name=self.display_name(user)),
+                    reply_markup=self.miniapp_keyboard(),
                 )
+                await self.offer_miniapp(chat_id, intro_thread)
             else:
-                await self.bot.send_message(chat_id=chat_id, text=self.t("dm_already_ready"))
+                await self.bot.send_message(
+                    chat_id=chat_id,
+                    text=self.t("dm_already_ready"),
+                    reply_markup=self.miniapp_keyboard(),
+                )
 
     async def _send_project_picker(self, chat_id: int, intro_key: str) -> None:
         rows = [
@@ -217,6 +281,7 @@ class OnboardingService:
         public = [BotCommand(command=c, description=self.t(f"cmd_{c}")) for c in PUBLIC_COMMANDS]
         owner = [BotCommand(command=c, description=self.t(f"cmd_{c}")) for c in OWNER_COMMANDS]
         await self.bot.set_my_commands(public, scope=BotCommandScopeDefault())
+        await self.sync_menu_button()
         if self.settings.owner_tg_id is not None:
             await self.bot.set_my_commands(
                 public + owner, scope=BotCommandScopeChat(chat_id=self.settings.owner_tg_id)

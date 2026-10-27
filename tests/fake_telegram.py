@@ -105,13 +105,15 @@ def command_update(user: dict, text: str, update_id: int = 3) -> dict:
     }
 
 
-def callback_update(user: dict, data: str, update_id: int = 4) -> dict:
-    return {
-        "update_id": update_id,
-        "callback_query": {
-            "id": "cb1",
-            "from": user,
-            "chat_instance": "ci",
-            "data": data,
-        },
-    }
+def callback_update(
+    user: dict, data: str, update_id: int = 4, message_id: int | None = None
+) -> dict:
+    query = {"id": "cb1", "from": user, "chat_instance": "ci", "data": data}
+    if message_id is not None:
+        query["message"] = {
+            "message_id": message_id,
+            "date": 0,
+            "chat": {"id": user["id"], "type": "private"},
+            "text": "offer",
+        }
+    return {"update_id": update_id, "callback_query": query}

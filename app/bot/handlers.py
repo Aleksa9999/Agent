@@ -4,10 +4,11 @@ A Router can be attached to one Dispatcher only, so every tenant gets its own ro
 """
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import JOIN_TRANSITION, ChatMemberUpdatedFilter, Command, CommandStart
 from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
 
-from app.bot.service import OnboardingService, parse_context_callback
+from app.bot.service import MINIAPP_LATER, OnboardingService, parse_context_callback
 
 
 def build_router() -> Router:
@@ -51,6 +52,15 @@ def build_router() -> Router:
             await query.answer(svc.t("project_set", name=svc.t(f"topic_{kind}")))
             return
         await query.answer(svc.t("stale_button"), show_alert=True)
+
+    @router.callback_query(F.data == MINIAPP_LATER)
+    async def on_miniapp_later(query: CallbackQuery, svc: OnboardingService) -> None:
+        await query.answer(svc.t("miniapp_later_ack"))
+        if isinstance(query.message, Message):
+            try:
+                await query.message.delete()
+            except TelegramBadRequest:
+                pass  # too old to delete: the answer above is enough
 
     @router.callback_query()
     async def on_stale_button(query: CallbackQuery, svc: OnboardingService) -> None:
