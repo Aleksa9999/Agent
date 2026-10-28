@@ -7,6 +7,7 @@ import { CatalogScreen } from "./catalog";
 import { HomeScreen } from "./home";
 import { ProfileScreen } from "./profile";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
+import { waitForInitData } from "@/lib/telegram";
 
 type TelegramWebApp = {
   initData?: string;
@@ -26,6 +27,7 @@ export default function Home() {
   const [state, setState] = useState<SessionState>({ kind: "loading" });
   const [locale, setLocale] = useState<Locale>("ru");
   const [homeKey, setHomeKey] = useState(0);
+  const [initData, setInitData] = useState("");
 
   const open = useCallback(async () => {
     setState({ kind: "loading" });
@@ -33,7 +35,13 @@ export default function Home() {
     app?.ready();
     app?.expand();
     setLocale(pickLocale(app?.initDataUnsafe?.user?.language_code));
-    const next = await loadSession(app?.initData, tenantFromSearch(window.location.search));
+    const data = await waitForInitData({
+      app: window.Telegram?.WebApp,
+      hash: window.location.hash,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    });
+    setInitData(data ?? "");
+    const next = await loadSession(data, tenantFromSearch(window.location.search));
     if (next.kind === "ready") setLocale(pickLocale(next.locale));
     setState(next);
   }, []);
@@ -49,7 +57,7 @@ export default function Home() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 py-8">
       {state.kind === "loading" && <p className="text-[var(--tg-hint)]">{t(locale, "loading")}</p>}
-      {state.kind === "outside_telegram" && screen("outside_title", "outside_body")}
+      {state.kind === "outside_telegram" && screen("outside_title", "outside_body", true)}
       {state.kind === "expired" && screen("expired_title", "expired_body")}
       {state.kind === "denied" && screen("denied_title", "denied_body")}
       {state.kind === "error" && screen("error_title", "error_body", true)}
@@ -61,19 +69,19 @@ export default function Home() {
           />
           <HomeScreen
             locale={locale}
-            initData={window.Telegram?.WebApp?.initData ?? ""}
+            initData={initData}
             tenant={tenantFromSearch(window.location.search)}
             refreshKey={homeKey}
           />
           <ProfileScreen
             onConfirmed={() => setHomeKey((key) => key + 1)}
             locale={locale}
-            initData={window.Telegram?.WebApp?.initData ?? ""}
+            initData={initData}
             tenant={tenantFromSearch(window.location.search)}
           />
           <CatalogScreen
             locale={locale}
-            initData={window.Telegram?.WebApp?.initData ?? ""}
+            initData={initData}
             tenant={tenantFromSearch(window.location.search)}
           />
         </>
