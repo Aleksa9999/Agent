@@ -9,7 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+    # an empty value in the env file (QWEN_BASE_URL=) means "not set": the default applies
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", env_ignore_empty=True)
 
     app_env: Literal["test", "prod"] = "test"
     tenants_dir: Path = Path("config/tenants")

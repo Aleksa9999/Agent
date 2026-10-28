@@ -113,3 +113,16 @@ def test_a_required_value_cannot_be_left_empty(tmp_path):
     result, target = _write_env(tmp_path, "\n")
     assert result.returncode != 0 and "TG_TEST_BOT_TOKEN is required" in result.stderr
     assert not target.exists()
+
+
+def test_an_empty_line_in_the_env_file_means_not_set(monkeypatch):
+    """`QWEN_BASE_URL=` copied from .env.example must not wipe the default address."""
+    from app.config import Settings
+
+    monkeypatch.setenv("QWEN_BASE_URL", "")
+    monkeypatch.setenv("QWEN_ASR_BASE_URL", "")
+    monkeypatch.setenv("TG_BOT_TOKEN", "")
+    settings = Settings()
+    assert settings.qwen_base_url.startswith("https://")
+    assert settings.qwen_asr_base_url.startswith("https://")
+    assert settings.tg_bot_token is None
