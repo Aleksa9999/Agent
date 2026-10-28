@@ -12,6 +12,7 @@ checked against recorded payloads only; the first call with a real key happens a
 
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from typing import Protocol
 
@@ -140,6 +141,22 @@ def _tool_call(item: dict) -> ToolCall:
     )
 
 
+_KEYLIKE = re.compile(r"sk-[A-Za-z0-9*._-]+")
+
+
+def provider_error(body: bytes | str) -> str:
+    """The provider's own error code and message, short and without anything key-like."""
+    try:
+        data = json.loads(body)
+        error = data.get("error", data) if isinstance(data, dict) else {}
+        code = str(error.get("code") or error.get("type") or "")
+        message = str(error.get("message") or "")
+    except (ValueError, AttributeError):
+        return ""
+    text = _KEYLIKE.sub("sk-***", f"{code}: {message}".strip(": "))
+    return text[:300]
+
+
 class QwenResponsesClient:
     def __init__(
         self,
@@ -168,7 +185,8 @@ class QwenResponsesClient:
         except httpx.HTTPError as exc:
             raise ModelError(f"model request failed: {type(exc).__name__}") from None
         if response.status_code != 200:
-            raise ModelError(f"model returned HTTP {response.status_code}")
+            detail = provider_error(response.content)
+            raise ModelError(f"model returned HTTP {response.status_code} {detail}".strip())
         return parse_response(response.json())
 
     async def stream(self, request: ModelRequest) -> AsyncIterator[StreamEvent]:
@@ -179,7 +197,8 @@ class QwenResponsesClient:
                 "POST", self._url, headers=self._headers, json=payload
             ) as response:
                 if response.status_code != 200:
-                    raise ModelError(f"model returned HTTP {response.status_code}")
+                    detail = provider_error(await response.aread())
+                    raise ModelError(f"model returned HTTP {response.status_code} {detail}".strip())
                 async for line in response.aiter_lines():
                     event = _sse_event(line)
                     if event is not None:

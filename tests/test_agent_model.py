@@ -159,6 +159,23 @@ async def test_client_errors_never_contain_the_key():
     assert FAKE_KEY not in str(caught.value)
 
 
+async def test_a_refusal_carries_the_provider_code_but_never_a_key():
+    body = {"error": {"code": "invalid_parameter_error", "message": f"bad field, key {FAKE_KEY}"}}
+    client = _client(lambda request: httpx.Response(400, json=body))
+    with pytest.raises(ModelError) as caught:
+        await client.complete(_req())
+    assert "HTTP 400" in str(caught.value) and "invalid_parameter_error" in str(caught.value)
+    assert FAKE_KEY not in str(caught.value)
+    with pytest.raises(ModelError) as caught:  # the same for a streamed request
+        async for _ in client.stream(_req()):
+            pass
+    assert "invalid_parameter_error" in str(caught.value)
+    odd = _client(lambda request: httpx.Response(502, text="<html>gateway</html>"))
+    with pytest.raises(ModelError) as caught:
+        await odd.complete(_req())
+    assert str(caught.value) == "model returned HTTP 502"
+
+
 async def test_client_streams_server_sent_events():
     body = (
         'data: {"type":"response.output_text.delta","delta":"A"}\n\n'
