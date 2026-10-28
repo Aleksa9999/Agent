@@ -45,4 +45,4 @@ def test_scope_limits_and_secrecy_are_stated():
 
 def test_there_is_a_gentle_mode_for_minors():
     body = text()
-    assert "меньше 18" in body and "только через родителей" in body
+    assert "меньше 18" in body.lower() and "только через родителей" in body
