@@ -1,7 +1,7 @@
 {
   "loading": "Opening…",
   "outside_title": "Open from Telegram",
-  "outside_body": "This app works inside Telegram only. Open the bot and press “Open Googlagent”.",
+  "outside_body": "This app only works inside Telegram. Open the bot and press the blue “Open Googlagent” button left of the input field, or the “Open” button in a bot message.",
   "expired_title": "Session expired",
   "expired_body": "Close this window and open the app from the bot again.",
   "denied_title": "Could not confirm your sign-in",

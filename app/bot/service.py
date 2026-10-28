@@ -18,10 +18,9 @@ from aiogram.types import (
     Document,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
     MenuButtonWebApp,
     Message,
-    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     User,
     WebAppInfo,
 )
@@ -180,15 +179,11 @@ class OnboardingService:
             return None
         return f"{base}/?tenant={self.tenant_id}"
 
-    def miniapp_keyboard(self) -> ReplyKeyboardMarkup | None:
-        """The always-visible blue button above the keyboard."""
-        url = self.miniapp_url()
-        if url is None:
-            return None
-        button = KeyboardButton(
-            text=self.t("open_miniapp"), web_app=WebAppInfo(url=url), style=BLUE
-        )
-        return ReplyKeyboardMarkup(keyboard=[[button]], is_persistent=True, resize_keyboard=True)
+    def remove_old_keyboard(self) -> ReplyKeyboardRemove:
+        """The old button over the keyboard is taken away: an app opened from a keyboard button
+        gets no sign-in data from Telegram, so it can never log the person in. The menu button
+        next to the input field and the "Open" button in messages do."""
+        return ReplyKeyboardRemove(remove_keyboard=True)
 
     async def offer_miniapp(self, chat_id: int, thread_id: int | None = None) -> None:
         """Ask before opening: the app opens only after the person presses Open."""
@@ -256,14 +251,14 @@ class OnboardingService:
                     chat_id=chat_id,
                     message_thread_id=intro_thread,
                     text=self.t("dm_ready", name=self.display_name(user)),
-                    reply_markup=self.miniapp_keyboard(),
+                    reply_markup=self.remove_old_keyboard(),
                 )
                 await self.offer_miniapp(chat_id, intro_thread)
             else:
                 await self.bot.send_message(
                     chat_id=chat_id,
                     text=self.t("dm_already_ready"),
-                    reply_markup=self.miniapp_keyboard(),
+                    reply_markup=self.remove_old_keyboard(),
                 )
 
     async def _send_project_picker(self, chat_id: int, intro_key: str) -> None:

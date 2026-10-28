@@ -108,16 +108,17 @@ def test_session_needs_a_known_tenant_and_a_configured_token(settings, runtime, 
     assert _post(app_client, signed(), tenant="nobody").status_code == 404
 
 
-async def test_start_shows_a_blue_persistent_button_and_asks_before_opening(runtime, session):
+async def test_start_removes_the_old_keyboard_button_and_offers_a_blue_open_button(
+    runtime, session
+):
+    """An app opened from a keyboard button gets no sign-in data, so that button is gone;
+    the sign-in works from the menu button and from the inline "Open" button."""
     runtime.settings.webapp_url = URL
     anna = person(7)
     await runtime.feed("default", command_update(anna, "/start"))
 
     intro, offer = session.of("sendMessage")[-2:]
-    (blue,) = intro.reply_markup.keyboard[0]
-    assert blue.style == "primary" and blue.text == "Открыть Googlagent"
-    assert blue.web_app.url == f"{URL}/?tenant=default"
-    assert intro.reply_markup.is_persistent is True
+    assert intro.reply_markup.remove_keyboard is True  # the persistent button is taken away
 
     open_button, later_button = offer.reply_markup.inline_keyboard[0]
     assert "Откроем Mini App?" in offer.text
@@ -143,9 +144,12 @@ async def test_setup_installs_the_menu_button(runtime, session):
     assert menu.menu_button.web_app.url == f"{URL}/?tenant=default"
 
 
-async def test_without_an_https_address_there_is_no_button_and_no_offer(runtime, session):
+async def test_without_an_https_address_there_is_no_open_button_and_no_offer(runtime, session):
     runtime.settings.webapp_url = "http://insecure.example.test"
     await runtime.feed("default", command_update(person(7), "/start"))
-    assert all(m.reply_markup is None for m in session.of("sendMessage"))
+    for message in session.of("sendMessage"):
+        markup = message.reply_markup
+        assert markup is None or getattr(markup, "remove_keyboard", False)  # never an app button
+        assert not getattr(markup, "inline_keyboard", None)
     await runtime.service("default").sync_menu_button()
     assert session.of("setChatMenuButton") == []
