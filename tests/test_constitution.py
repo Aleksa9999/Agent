@@ -46,3 +46,15 @@ def test_scope_limits_and_secrecy_are_stated():
 def test_there_is_a_gentle_mode_for_minors():
     body = text()
     assert "меньше 18" in body.lower() and "только через родителей" in body
+
+
+def test_choices_are_buttons_never_typed_answers():
+    body = text()
+    assert "ЛЮБОЙ выбор" in body and "только через ask_options" in body
+    assert "Никогда не проси «напиши»" in body and "«Свой ответ»" in body
+
+
+def test_the_agent_does_not_promise_what_it_cannot_do_yet():
+    body = text()
+    assert "Не умеешь и не обещаешь" in body and "ngrok" in body
+    assert "пакет промптов" in body
