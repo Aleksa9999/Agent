@@ -171,13 +171,13 @@ pass_public_line: '• {label}: {text}'
 tier_economy: Economy
 tier_standard: Standard
 tier_premium: Premium
-run_intro: Starting the skill “{title}”. First choose the road.
-run_roads: '• The agent does it: the platform leads the work, you accept the result.
+run_intro: '🚀 Skill “{title}”. Pick the road:'
+run_roads: '🤖 The agent does it: I lead, you accept the result.
 
-  • I do it myself: I give a prompt pack and the order of steps, you work on your side.'
-run_code_note: For skills with code the platform now takes the work to a spec, tasks and a prompt pack; the project code is written later.
-run_estimate_head: 'Estimate by AI box tier:'
-run_estimate_tier: '{tier}: {roles}'
+  🧑‍💻 I do it myself: I give prompts and steps, you work on your side.'
+run_code_note: For skills with code we now take it to a spec, tasks and prompts; the project code is written later.
+run_estimate_head: '💰 Estimate by tier:'
+run_estimate_tier: '• {tier}: {roles}'
 run_road_agent: The agent does it
 run_road_self: I do it myself
 run_road_agent_text: 'Starting the skill “{title}”. Road: the agent does it.'
@@ -224,7 +224,7 @@ tasks_fix_text: The breakdown needs fixing. Ask what exactly is wrong and propos
 tasks_add_text: A slice is needed for the criteria that nothing closes. Propose a new breakdown.
 tasks_aware_question: Criteria {criteria} are not closed by any slice
 tasks_aware_decision: consciously left without a slice
-tasks_estimate_intro: 'Estimate for this breakdown. Prices come from the model catalog only:'
+tasks_estimate_intro: '💰 Estimate for this breakdown:'
 pack_title: '“Do it yourself” pack: {title}'
 pack_h_steps: Order of work
 pack_h_rules: Rules for your Claude Code (put them into CLAUDE.md)
@@ -239,5 +239,6 @@ pack_context: 'Context: {text}'
 pack_constraints: 'Constraints: {text}'
 pack_checks: 'Checks: {text}'
 pack_caption: The “do it yourself” prompt pack for the skill “{title}”.
-pack_done: 'The pack is ready. Work through it on your side, and when you have a result on your own task, bring it here: I check it against the criteria.'
+pack_done: '📦 The pack is ready! Work through it on your side and come back with the result: we check it against the criteria.'
 pack_filename: skill-pack
+run_estimate_noprice: 'No prices yet: nothing found in the model catalog, I do not quote from memory.'

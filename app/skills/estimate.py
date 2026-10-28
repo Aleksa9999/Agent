@@ -42,28 +42,32 @@ def estimate_view(doc: SkillDoc, catalog: ModelCatalog) -> list[dict]:
 
 
 def estimate_text(tr: Translator, tenant: str, doc: SkillDoc, catalog: ModelCatalog) -> str:
-    """The estimate as lines for the chat."""
+    """The estimate as a short block for the chat: one line per tier, then each price once."""
     lines = [tr.t(tenant, "run_estimate_head")]
+    prices: dict[str, dict] = {}
+    unknown = False
     for tier in estimate_view(doc, catalog):
         roles = ", ".join(r["role"] for r in tier["roles"])
-        lines.append(
-            tr.t(tenant, "run_estimate_tier", tier=tr.t(tenant, f"tier_{tier['id']}"), roles=roles)
-        )
+        name = tr.t(tenant, f"tier_{tier['id']}")
+        lines.append(tr.t(tenant, "run_estimate_tier", tier=name, roles=roles))
         for role in tier["roles"]:
             if role["capability"] is None:
                 continue
             if role["models"]:
-                m = role["models"][0]
-                lines.append(
-                    tr.t(
-                        tenant,
-                        "price_line",
-                        model_id=m["model_id"],
-                        capability=role["capability"],
-                        prices=m["prices"],
-                        synced_at=m["synced_at"],
-                    )
-                )
+                prices.setdefault(role["capability"], role["models"][0])
             else:
-                lines.append(tr.t(tenant, "price_not_found", query=role["role"]))
+                unknown = True
+    for capability, m in prices.items():
+        lines.append(
+            tr.t(
+                tenant,
+                "price_line",
+                model_id=m["model_id"],
+                capability=capability,
+                prices=m["prices"],
+                synced_at=m["synced_at"],
+            )
+        )
+    if unknown:
+        lines.append(tr.t(tenant, "run_estimate_noprice"))
     return "\n".join(lines)

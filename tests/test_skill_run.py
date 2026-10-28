@@ -388,7 +388,7 @@ async def test_the_skill_can_be_started_from_the_mini_app(api, session):
     await runtime.feed("default", command_update(ANNA, "/start"))
     ok = client.post(url, headers=auth())
     assert ok.status_code == 200 and ok.json() == {"started": True, "error": None}
-    assert "Запускаю навык «Карточка идеи»" in last_message(session).text
+    assert "Навык «Карточка идеи»" in last_message(session).text
     missing = client.post("/api/miniapp/default/skills/no-such/start", headers=auth())
     assert missing.status_code == 404
     assert (
