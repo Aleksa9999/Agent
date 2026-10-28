@@ -49,6 +49,25 @@ export function ProfileScreen({ locale, initData, tenant, onConfirmed }: Props) 
     void load();
   }, [load]);
 
+  // The person may have sent a voice message in the chat meanwhile: refresh when the app is
+  // shown again, keeping the screen they are on.
+  useEffect(() => {
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      const result = await loadProfile(initData, tenant);
+      if (result.kind === "ready") {
+        setProfile(result.profile);
+        setFailed(false);
+      }
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [initData, tenant]);
+
   if (failed) {
     return (
       <section className="flex flex-col gap-3">
@@ -151,8 +170,16 @@ function Recorder(props: {
     browserMicSupport() === "ok" ? null : "mic_unavailable_body",
   );
   const recording = useRef<Recording | null>(null);
+  const [seconds, setSeconds] = useState(0);
 
   useEffect(() => () => recording.current?.cancel(), []);
+
+  useEffect(() => {
+    if (state !== "recording") return;
+    setSeconds(0);
+    const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [state]);
 
   const finish = useCallback(async () => {
     const active = recording.current;
@@ -199,7 +226,15 @@ function Recorder(props: {
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">{t(locale, "profile_title")}</h2>
-      <p className="text-[var(--tg-hint)]">{t(locale, "rec_hint")}</p>
+      <div className="flex flex-col gap-2 rounded-3xl bg-[var(--tg-hint)]/10 p-4">
+        <p className="text-sm font-medium">{t(locale, "rec_guide_title")}</p>
+        <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
+          {(["rec_g1", "rec_g2", "rec_g3", "rec_g4", "rec_g5"] as const).map((key) => (
+            <li key={key}>{t(locale, key)}</li>
+          ))}
+        </ol>
+      </div>
+      <p className="text-sm text-[var(--tg-hint)]">{t(locale, "rec_hint")}</p>
       {state === "idle" && (
         <button type="button" onClick={() => void start()} className={primary}>
           🎙 {t(locale, "rec_start")}
@@ -208,7 +243,7 @@ function Recorder(props: {
       {state === "recording" && (
         <>
           <p role="status" className="font-medium">
-            ● {t(locale, "rec_recording")}
+            ● {t(locale, "rec_timer", { seconds: String(seconds) })}
           </p>
           <button type="button" onClick={() => void finish()} className={primary}>
             {t(locale, "rec_stop")}

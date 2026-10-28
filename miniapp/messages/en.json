@@ -46,7 +46,7 @@
   "profile_form": "Fill in the form with buttons",
   "profile_voice_off": "Voice recognition is not connected yet. Fill in the form with buttons.",
   "profile_continue": "We continue from the same question.",
-  "rec_hint": "Speak freely: who you are, what you want in 10 weeks and in a year, how much time and budget you have, what you can do.",
+  "rec_hint": "Do not worry about slips: I note the main things and ask only what you missed.",
   "rec_start": "Start recording",
   "rec_stop": "Finish and send",
   "rec_recording": "Recording… speak",
@@ -178,5 +178,13 @@
   "set_about_text": "Googlagent: the studio's personal AI agent. A skill counts after the test, a result on your own task and the “It worked” button.",
   "set_data": "My data",
   "set_data_text": "Deleting your data in one command is coming in the next updates.",
-  "diag_label": "For support"
+  "diag_label": "For support",
+  "rec_guide_title": "Tell me in this order, about a minute each:",
+  "rec_g1": "Who are you and what do you do now?",
+  "rec_g2": "What do you want in 10 weeks and in a year?",
+  "rec_g3": "How many hours a week and what budget do you have?",
+  "rec_g4": "What do you already have: an idea, a business, an audience?",
+  "rec_g5": "What can you do and how do you work with AI?",
+  "rec_timer": "Recording: {seconds} s",
+  "refresh": "Refresh"
 }
