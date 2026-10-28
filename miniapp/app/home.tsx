@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type FirstResult, type Home, loadHome, runFirstResult, runFirstResultVoice } from "@/lib/home";
 import { type Locale, type MessageKey, t, tByName } from "@/lib/messages";
-import { parseBlocks } from "@/lib/markdown";
+import { type Inline, parseBlocks, parseInline } from "@/lib/markdown";
 import { type Recording, browserMicSupport, startRecording } from "@/lib/recorder";
 import { StartSkillButton } from "./start-skill";
 
@@ -198,7 +198,7 @@ function FirstResultBlock(props: {
 
 function Result({ locale, result }: { locale: Locale; result: FirstResult }) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-[var(--tg-hint)]/30 p-4 text-sm">
+    <div className="flex flex-col gap-3 rounded-3xl bg-[var(--tg-hint)]/10 p-4 text-sm">
       {parseBlocks(result.text).map((block, index) =>
         block.kind === "table" ? (
           <div key={index} className="overflow-x-auto">
@@ -225,9 +225,21 @@ function Result({ locale, result }: { locale: Locale; result: FirstResult }) {
               </tbody>
             </table>
           </div>
+        ) : block.kind === "heading" ? (
+          <h4 key={index} className="pt-1 text-base font-semibold">
+            <Rich text={block.text} />
+          </h4>
+        ) : block.kind === "list" ? (
+          <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
+            {block.items.map((item, i) => (
+              <li key={i}>
+                <Rich text={item} />
+              </li>
+            ))}
+          </ul>
         ) : (
           <p key={index} className="whitespace-pre-line">
-            {block.text}
+            <Rich text={block.text} />
           </p>
         ),
       )}
@@ -238,5 +250,21 @@ function Result({ locale, result }: { locale: Locale; result: FirstResult }) {
         </details>
       )}
     </div>
+  );
+}
+
+function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {parseInline(text).map((part: Inline, i) =>
+        part.kind === "bold" ? (
+          <strong key={i}>{part.text}</strong>
+        ) : part.kind === "italic" ? (
+          <em key={i}>{part.text}</em>
+        ) : (
+          <span key={i}>{part.text}</span>
+        ),
+      )}
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { loadHome, runFirstResult, runFirstResultVoice } from "./home";
-import { parseBlocks } from "./markdown";
+import { parseBlocks, parseInline } from "./markdown";
 
 const reply = (status: number, body: unknown = {}) =>
   vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status }));
@@ -45,5 +45,27 @@ describe("parseBlocks", () => {
   it("keeps a lone bar line as text and survives empty input", () => {
     expect(parseBlocks("| не таблица")).toEqual([{ kind: "text", text: "| не таблица" }]);
     expect(parseBlocks("")).toEqual([]);
+  });
+});
+
+describe("markdown for results", () => {
+  it("turns headings and bullet lists into blocks", () => {
+    expect(parseBlocks("## Карточка идеи\n\n- **Для кого:** эксперты\n- Проблема\n\nИтог")).toEqual([
+      { kind: "heading", level: 2, text: "Карточка идеи" },
+      { kind: "list", items: ["**Для кого:** эксперты", "Проблема"] },
+      { kind: "text", text: "Итог" },
+    ]);
+  });
+
+  it("reads bold and italic and leaves unclosed marks alone", () => {
+    expect(parseInline("a **b** c *d* e")).toEqual([
+      { kind: "text", text: "a " },
+      { kind: "bold", text: "b" },
+      { kind: "text", text: " c " },
+      { kind: "italic", text: "d" },
+      { kind: "text", text: " e" },
+    ]);
+    expect(parseInline("2 * 3 и **без конца")).toEqual([{ kind: "text", text: "2 * 3 и **без конца" }]);
+    expect(parseInline("<b>html</b>")).toEqual([{ kind: "text", text: "<b>html</b>" }]);
   });
 });
