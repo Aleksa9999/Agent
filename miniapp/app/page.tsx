@@ -6,6 +6,7 @@ import { type Locale, type MessageKey, pickLocale, t } from "@/lib/messages";
 import { CatalogScreen } from "./catalog";
 import { HomeScreen } from "./home";
 import { ProfileScreen } from "./profile";
+import { type Tab, TabBar } from "./tabbar";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
 import { waitForInitData } from "@/lib/telegram";
 
@@ -28,6 +29,7 @@ export default function Home() {
   const [locale, setLocale] = useState<Locale>("ru");
   const [homeKey, setHomeKey] = useState(0);
   const [initData, setInitData] = useState("");
+  const [tab, setTab] = useState<Tab>("home");
 
   const open = useCallback(async () => {
     setState({ kind: "loading" });
@@ -54,38 +56,50 @@ export default function Home() {
     <Message title={t(locale, title)} body={t(locale, body)} retry={retry ? { label: t(locale, "retry"), run: open } : undefined} />
   );
 
+  const tenant = typeof window === "undefined" ? "default" : tenantFromSearch(window.location.search);
+
+  if (state.kind === "ready") {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col pb-28">
+        <header className="rounded-b-3xl bg-gradient-to-br from-[var(--tg-button)] to-[color-mix(in_srgb,var(--tg-button)_55%,#7c3aed)] px-5 pb-7 pt-8 text-[var(--tg-button-text)]">
+          <h1 className="text-3xl font-bold">{t(locale, "hello", { name: state.user.first_name })}</h1>
+          <p className="pt-2 text-sm opacity-90">{t(locale, "hero_line")}</p>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 px-5 pt-5">
+          {tab === "home" && (
+            <HomeScreen
+              locale={locale}
+              initData={initData}
+              tenant={tenant}
+              refreshKey={homeKey}
+              onStartTest={() => setTab("profile")}
+            />
+          )}
+          {tab === "skills" && <CatalogScreen locale={locale} initData={initData} tenant={tenant} />}
+          {tab === "profile" && (
+            <ProfileScreen
+              locale={locale}
+              initData={initData}
+              tenant={tenant}
+              onConfirmed={() => {
+                setHomeKey((key) => key + 1);
+                setTab("home");
+              }}
+            />
+          )}
+        </div>
+        <TabBar locale={locale} active={tab} onChange={setTab} />
+      </main>
+    );
+  }
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 py-8">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-5 py-8">
       {state.kind === "loading" && <p className="text-[var(--tg-hint)]">{t(locale, "loading")}</p>}
       {state.kind === "outside_telegram" && screen("outside_title", "outside_body", true)}
       {state.kind === "expired" && screen("expired_title", "expired_body")}
       {state.kind === "denied" && screen("denied_title", "denied_body")}
       {state.kind === "error" && screen("error_title", "error_body", true)}
-      {state.kind === "ready" && (
-        <>
-          <Message
-            title={t(locale, "hello", { name: state.user.first_name })}
-            body={t(locale, "ready_body")}
-          />
-          <HomeScreen
-            locale={locale}
-            initData={initData}
-            tenant={tenantFromSearch(window.location.search)}
-            refreshKey={homeKey}
-          />
-          <ProfileScreen
-            onConfirmed={() => setHomeKey((key) => key + 1)}
-            locale={locale}
-            initData={initData}
-            tenant={tenantFromSearch(window.location.search)}
-          />
-          <CatalogScreen
-            locale={locale}
-            initData={initData}
-            tenant={tenantFromSearch(window.location.search)}
-          />
-        </>
-      )}
     </main>
   );
 }

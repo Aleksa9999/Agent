@@ -8,9 +8,9 @@ import { parseBlocks } from "@/lib/markdown";
 import { type Recording, browserMicSupport, startRecording } from "@/lib/recorder";
 import { StartSkillButton } from "./start-skill";
 
-type Props = { locale: Locale; initData: string; tenant: string; refreshKey: number };
+type Props = { locale: Locale; initData: string; tenant: string; refreshKey: number; onStartTest?: () => void };
 
-export function HomeScreen({ locale, initData, tenant, refreshKey }: Props) {
+export function HomeScreen({ locale, initData, tenant, refreshKey, onStartTest }: Props) {
   const [home, setHome] = useState<Home | null>(null);
 
   const load = useCallback(async () => {
@@ -22,7 +22,22 @@ export function HomeScreen({ locale, initData, tenant, refreshKey }: Props) {
     void load();
   }, [load, refreshKey]);
 
-  if (!home || !home.track) return null;
+  if (!home) return null;
+  if (!home.track) {
+    return (
+      <section className="flex flex-col gap-3 rounded-3xl border border-[var(--tg-hint)]/25 p-5">
+        <h2 className="text-xl font-semibold">{t(locale, "invite_title")}</h2>
+        <p className="text-[var(--tg-hint)]">{t(locale, "invite_body")}</p>
+        <button
+          type="button"
+          onClick={onStartTest}
+          className="self-start rounded-full bg-[var(--tg-button)] px-6 py-3 font-medium text-[var(--tg-button-text)] focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          {t(locale, "invite_cta")}
+        </button>
+      </section>
+    );
+  }
   return (
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">

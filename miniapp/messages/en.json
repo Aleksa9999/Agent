@@ -151,5 +151,13 @@
   "skill_error_no_chat": "First open the chat with the bot and press Start.",
   "skill_error_unknown_skill": "This skill is not in the catalog.",
   "skill_error_unavailable": "Starting a skill is unavailable right now.",
-  "skill_error_network": "No connection. Check the internet and try again."
+  "skill_error_network": "No connection. Check the internet and try again.",
+  "tab_home": "Home",
+  "tab_skills": "Skills",
+  "tab_profile": "Profile",
+  "tabs_label": "Sections",
+  "hero_line": "I am your personal agent: I pick skills, help with your work and explain things simply.",
+  "invite_title": "Let's start with you",
+  "invite_body": "Tell me about yourself in a couple of minutes, and I pick your first three skills and make a first result.",
+  "invite_cta": "Take the test"
 }
