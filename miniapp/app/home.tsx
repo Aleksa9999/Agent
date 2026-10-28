@@ -57,11 +57,13 @@ export function HomeScreen({ locale, initData, tenant, refreshKey, onStartTest }
         <h3 className="font-medium">{t(locale, "home_skills")}</h3>
         <ul className="flex flex-col gap-2">
           {home.skills.map((skill) => (
-            <li key={skill.slug} className="rounded-xl border border-[var(--tg-hint)]/30 px-4 py-3">
+            <li key={skill.slug} className="rounded-3xl bg-[var(--tg-hint)]/10 px-4 py-3">
               <p className="font-medium">{skill.title}</p>
               <p className="text-xs text-[var(--tg-hint)]">
                 {tByName(locale, `branch_${skill.branch}`)} ·{" "}
-                {t(locale, skill.status === "verified" ? "home_status_verified" : "home_status_unverified")}
+                <span className="rounded-full bg-[var(--tg-button)]/15 px-2 py-0.5 text-[var(--tg-button)]">
+                  {t(locale, skill.status === "verified" ? "home_status_verified" : "home_status_unverified")}
+                </span>
                 {skill.extra ? ` · ${t(locale, "home_extra")}` : ""}
               </p>
               <div className="pt-2">
@@ -77,7 +79,7 @@ export function HomeScreen({ locale, initData, tenant, refreshKey, onStartTest }
         <h3 className="font-medium">{t(locale, "home_tree")}</h3>
         <ul className="grid grid-cols-2 gap-2">
           {home.branches.map((branch) => (
-            <li key={branch.id} className="rounded-xl border border-[var(--tg-hint)]/30 px-3 py-2 text-sm">
+            <li key={branch.id} className="rounded-3xl bg-[var(--tg-hint)]/10 px-4 py-3 text-sm">
               <p className="font-medium">{tByName(locale, `branch_${branch.id}`)}</p>
               <p className="text-xs text-[var(--tg-hint)]">
                 {t(locale, "home_branch_count", {

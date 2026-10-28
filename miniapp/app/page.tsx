@@ -6,6 +6,7 @@ import { type Locale, type MessageKey, pickLocale, t } from "@/lib/messages";
 import { CatalogScreen } from "./catalog";
 import { HomeScreen } from "./home";
 import { ProfileScreen } from "./profile";
+import { SettingsScreen } from "./settings";
 import { type Tab, TabBar } from "./tabbar";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
 import { waitForInitData } from "@/lib/telegram";
@@ -76,6 +77,15 @@ export default function Home() {
             />
           )}
           {tab === "skills" && <CatalogScreen locale={locale} initData={initData} tenant={tenant} />}
+          {tab === "settings" && (
+            <SettingsScreen
+              locale={locale}
+              initData={initData}
+              tenant={tenant}
+              onLocale={setLocale}
+              onOpenProfile={() => setTab("profile")}
+            />
+          )}
           {tab === "profile" && (
             <ProfileScreen
               locale={locale}

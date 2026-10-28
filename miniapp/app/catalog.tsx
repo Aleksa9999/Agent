@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { type Catalog, type CatalogSkill, loadCatalog } from "@/lib/catalog";
+import { tap } from "@/lib/haptics";
 import { type Locale, t, tByName } from "@/lib/messages";
 import { StartSkillButton } from "./start-skill";
 
@@ -52,29 +53,33 @@ export function CatalogScreen({ locale, initData, tenant }: Props) {
           ))}
         </ul>
       </div>
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-[var(--tg-hint)]">{t(locale, "tree_title")}</h3>
-        {view.catalog.branches.map((branch) => (
-          <details key={branch.id} className="rounded-xl border border-[var(--tg-hint)]/30 px-4 py-3">
-            <summary className="cursor-pointer font-medium">
-              {tByName(locale, `branch_${branch.id}`)} · {branch.skills.length}
-            </summary>
-            {branch.skills.length === 0 ? (
-              <p className="pt-2 text-sm text-[var(--tg-hint)]">{t(locale, "empty_branch")}</p>
-            ) : (
-              <ul className="flex flex-col gap-1 pt-2">
-                {branch.skills.map((skill) => (
-                  <li key={skill.slug}>
-                    <button type="button" onClick={() => setOpen(skill)} className="w-full py-2 text-left">
-                      {skill.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </details>
+      {view.catalog.branches
+        .filter((branch) => branch.skills.length > 0)
+        .map((branch) => (
+          <div key={branch.id} className="flex flex-col gap-2">
+            <h3 className="px-1 text-lg font-semibold">{tByName(locale, `branch_${branch.id}`)}</h3>
+            <ul className="flex flex-col divide-y divide-[var(--tg-hint)]/20 overflow-hidden rounded-3xl bg-[var(--tg-hint)]/10">
+              {branch.skills.map((skill) => (
+                <li key={skill.slug}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      tap();
+                      setOpen(skill);
+                    }}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                  >
+                    <span className="flex flex-col">
+                      <span className="font-medium">{skill.title}</span>
+                      <span className="text-xs text-[var(--tg-hint)]">{tByName(locale, `kind_${skill.kind}`)}</span>
+                    </span>
+                    <span aria-hidden="true" className="text-[var(--tg-hint)]">›</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </div>
     </section>
   );
 }
@@ -138,4 +143,4 @@ function SkillCard({
 const primary =
   "self-start rounded-xl bg-[var(--tg-button)] px-5 py-3 font-medium text-[var(--tg-button-text)] focus-visible:outline-2 focus-visible:outline-offset-2";
 const card =
-  "flex h-full w-full flex-col gap-1 rounded-xl border border-[var(--tg-hint)]/30 px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2";
+  "flex h-full w-full flex-col gap-1 rounded-3xl bg-[var(--tg-hint)]/10 px-4 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2";
