@@ -195,7 +195,7 @@ class FirstResultService:
                 self.model.complete(request), timeout=MODEL_TIMEOUT_SECONDS
             )
         except (ModelError, TimeoutError) as exc:
-            log.warning("first result failed: %s", type(exc).__name__)
+            log.warning("first result failed: %s %s", type(exc).__name__, exc)
             raise FirstResultError("failed") from None
         seconds = time.monotonic() - started
         text = result.text.strip()

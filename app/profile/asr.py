@@ -11,6 +11,8 @@ from typing import Protocol
 
 import httpx
 
+from app.agent.model import provider_error
+
 log = logging.getLogger("app.profile")
 
 ALLOWED_MIME = frozenset(
@@ -83,6 +85,9 @@ class QwenAsrClient:
             response.raise_for_status()
             text = response.json()["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
-            log.warning("recognition failed: %s", type(exc).__name__)
+            detail = ""
+            if isinstance(exc, httpx.HTTPStatusError):  # the provider's own code, key masked
+                detail = f"HTTP {exc.response.status_code} {provider_error(exc.response.content)}"
+            log.warning("recognition failed: %s %s", type(exc).__name__, detail.strip())
             raise AsrError(type(exc).__name__) from None
         return text.strip() if isinstance(text, str) else ""
