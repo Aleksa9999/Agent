@@ -9,7 +9,7 @@ import { ProfileScreen } from "./profile";
 import { SettingsScreen } from "./settings";
 import { type Tab, TabBar } from "./tabbar";
 import { type SessionState, loadSession, tenantFromSearch } from "@/lib/session";
-import { waitForInitData } from "@/lib/telegram";
+import { describeLaunch, waitForInitData } from "@/lib/telegram";
 
 type TelegramWebApp = {
   initData?: string;
@@ -31,6 +31,7 @@ export default function Home() {
   const [homeKey, setHomeKey] = useState(0);
   const [initData, setInitData] = useState("");
   const [tab, setTab] = useState<Tab>("home");
+  const [diag, setDiag] = useState("");
 
   const open = useCallback(async () => {
     setState({ kind: "loading" });
@@ -44,6 +45,11 @@ export default function Home() {
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     });
     setInitData(data ?? "");
+    setDiag(
+      data
+        ? ""
+        : describeLaunch({ app: window.Telegram?.WebApp as never, hash: window.location.hash, href: window.location.href }),
+    );
     const next = await loadSession(data, tenantFromSearch(window.location.search));
     if (next.kind === "ready") setLocale(pickLocale(next.locale));
     setState(next);
@@ -107,6 +113,11 @@ export default function Home() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-5 py-8">
       {state.kind === "loading" && <p className="text-[var(--tg-hint)]">{t(locale, "loading")}</p>}
       {state.kind === "outside_telegram" && screen("outside_title", "outside_body", true)}
+      {state.kind === "outside_telegram" && diag && (
+        <p className="text-xs text-[var(--tg-hint)]">
+          {t(locale, "diag_label")}: {diag}
+        </p>
+      )}
       {state.kind === "expired" && screen("expired_title", "expired_body")}
       {state.kind === "denied" && screen("denied_title", "denied_body")}
       {state.kind === "error" && screen("error_title", "error_body", true)}

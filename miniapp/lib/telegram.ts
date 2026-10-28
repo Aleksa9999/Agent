@@ -20,3 +20,23 @@ export async function waitForInitData(env: Env, attempts = 12, stepMs = 250): Pr
   }
   return undefined;
 }
+
+/** A short line about what Telegram gave this page: shown on the "Open from Telegram" screen so
+ * that a screenshot says why the launch data is missing. It holds no personal data. */
+export function describeLaunch(env: {
+  app?: { initData?: string; platform?: string; version?: string };
+  hash: string;
+  href: string;
+}): string {
+  const params = new URLSearchParams(env.hash.replace(/^#/, ""));
+  const keys = Array.from(params.keys()).map((key) => key.replace(/^tgWebApp/, "")).join(",");
+  const query = env.href.includes("?") ? "query=yes" : "query=no";
+  return [
+    `script=${env.app ? "yes" : "no"}`,
+    `platform=${env.app?.platform ?? "-"}`,
+    `version=${env.app?.version ?? "-"}`,
+    `initData=${env.app?.initData ? "yes" : "no"}`,
+    `hash=[${keys || "empty"}]`,
+    query,
+  ].join(" ");
+}

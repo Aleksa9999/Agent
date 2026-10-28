@@ -177,5 +177,6 @@
   "set_about": "About",
   "set_about_text": "Googlagent: the studio's personal AI agent. A skill counts after the test, a result on your own task and the “It worked” button.",
   "set_data": "My data",
-  "set_data_text": "Deleting your data in one command is coming in the next updates."
+  "set_data_text": "Deleting your data in one command is coming in the next updates.",
+  "diag_label": "For support"
 }
